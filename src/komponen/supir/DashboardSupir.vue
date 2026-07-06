@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Play, Square, MapPin, UserCheck, RefreshCw } from 'lucide-vue-next';
+import { Play, Square, MapPin, UserCheck } from 'lucide-vue-next';
 import KartuUtama from '../umum/KartuUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 

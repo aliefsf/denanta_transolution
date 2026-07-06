@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router';
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import HalamanTamu from '../halaman/HalamanTamu.vue';
 import HalamanOrangTua from '../halaman/HalamanOrangTua.vue';
 import HalamanSupir from '../halaman/HalamanSupir.vue';

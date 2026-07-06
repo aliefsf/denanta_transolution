@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { usePenyimpananUtama } from '../penyimpanan/penyimpananUtama';
-import { Pengguna } from '../tipe';
+import type { Pengguna } from '../tipe';
 
 export function useAutentikasi() {
   const penyimpanan = usePenyimpananUtama();

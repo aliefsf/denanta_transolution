@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { Pengguna, Kordinat } from '../tipe';
+import type { Pengguna, Kordinat } from '../tipe';
 
 export const usePenyimpananUtama = defineStore('utama', () => {
   // State
