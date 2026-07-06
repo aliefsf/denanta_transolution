@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Tema gelap global untuk branding Denanta TranSolution */
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: #1a1a2e; /* warnaUtama */
+  color: #e2e8f0;
+  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #16213e; /* warnaSekunder */
+}
+::-webkit-scrollbar-thumb {
+  background: #0f3460; /* warnaAksen */
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e94560; /* warnaTombol */
+}
