@@ -3,9 +3,20 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../penyimpanan/authStore';
 import { 
-  LayoutDashboard, Users, Car, Map, CreditCard, 
-  LogOut, Menu, X, User, Bus, ChevronLeft, ChevronRight 
+  LayoutDashboard, Map, Truck, ClipboardCheck, Users, 
+  School, BarChart3, Wallet, UserCheck, Megaphone, 
+  Settings, LogOut, Menu, X, Bus, ChevronLeft, ChevronRight, Bell, ScrollText
 } from 'lucide-vue-next';
+
+interface Props {
+  tabAktif: string;
+}
+
+defineProps<Props>();
+
+const emit = defineEmits<{
+  (e: 'ubah-tab', tab: string): void;
+}>();
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -27,19 +38,32 @@ const handleLogout = async () => {
 };
 
 const menuList = [
-  { nama: 'Dashboard', path: '/admin', ikon: LayoutDashboard },
-  { nama: 'Manajemen Supir', path: '/admin', ikon: Car },
-  { nama: 'Daftar Siswa', path: '/admin', ikon: Users },
-  { nama: 'Manajemen Rute', path: '/admin', ikon: Map },
-  { nama: 'Kas & Pembayaran', path: '/admin', ikon: CreditCard },
+  { nama: 'Dashboard', id: 'dashboard', ikon: LayoutDashboard },
+  { nama: 'Pemantauan Global', id: 'pemantauan', ikon: Map },
+  { nama: 'Data Supir', id: 'supir', ikon: Truck },
+  { nama: 'Penugasan Supir', id: 'penugasan', ikon: ClipboardCheck },
+  { nama: 'Data Anak', id: 'anak', ikon: Users },
+  { nama: 'Data Sekolah', id: 'sekolah', ikon: School },
+  { nama: 'Laporan Performa', id: 'laporan', ikon: BarChart3 },
+  { nama: 'Manajemen Keuangan', id: 'keuangan', ikon: Wallet },
+  { nama: 'Daftar Pengguna', id: 'pengguna', ikon: UserCheck },
+  { nama: 'Pengumuman Masal', id: 'pengumuman', ikon: Megaphone },
+  { nama: 'Log Aktivitas', id: 'log', ikon: ScrollText },
+  { nama: 'Pengaturan Sistem', id: 'pengaturan', ikon: Settings }
 ];
+
+const setTab = (id: string) => {
+  emit('ubah-tab', id);
+  mobileSidebarTerbuka.value = false;
+};
 </script>
 
 <template>
   <div class="flex h-screen bg-warnaUtama text-slate-100 overflow-hidden">
+    
     <!-- Desktop Sidebar -->
     <aside 
-      class="hidden md:flex flex-col bg-warnaSekunder border-r border-warnaAksen/30 transition-all duration-300 relative z-30"
+      class="hidden md:flex flex-col bg-warnaSekunder border-r border-warnaAksen/30 transition-all duration-300 relative z-30 flex-shrink-0"
       :class="sidebarTerbuka ? 'w-64' : 'w-20'"
     >
       <!-- Logo Header -->
@@ -55,31 +79,20 @@ const menuList = [
         </div>
       </div>
 
-      <!-- User Card -->
-      <div class="p-4 border-b border-warnaAksen/20" v-show="sidebarTerbuka">
-        <div class="flex items-center space-x-3 bg-warnaUtama/50 p-2.5 rounded-xl border border-warnaAksen/20">
-          <div class="w-10 h-10 rounded-lg bg-warnaTombol/20 flex items-center justify-center text-warnaTombol">
-            <User class="w-5 h-5" />
-          </div>
-          <div class="overflow-hidden">
-            <h4 class="text-xs font-bold text-white truncate">{{ authStore.pengguna?.email?.split('@')[0] }}</h4>
-            <p class="text-[10px] text-slate-400 capitalize">{{ authStore.peran }}</p>
-          </div>
-        </div>
-      </div>
-
       <!-- Navigation Menu -->
       <nav class="flex-grow p-4 space-y-1.5 overflow-y-auto">
-        <router-link
+        <button
           v-for="menu in menuList"
-          :key="menu.nama"
-          :to="menu.path"
-          class="flex items-center text-slate-300 hover:text-white px-3 py-2.5 rounded-xl text-sm font-medium transition-all group"
-          active-class="bg-warnaAksen text-white shadow-lg border border-warnaAksen"
+          :key="menu.id"
+          @click="setTab(menu.id)"
+          class="w-full flex items-center text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all group cursor-pointer"
+          :class="{
+            'bg-warnaAksen text-white border border-warnaAksen shadow-lg': tabAktif === menu.id
+          }"
         >
-          <component :is="menu.ikon" class="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
+          <component :is="menu.ikon" class="w-4.5 h-4.5 flex-shrink-0 group-hover:scale-110 transition-transform" />
           <span v-show="sidebarTerbuka" class="ml-3 transition-opacity duration-300">{{ menu.nama }}</span>
-        </router-link>
+        </button>
       </nav>
 
       <!-- Collapse Trigger Button -->
@@ -95,9 +108,9 @@ const menuList = [
       <div class="p-4 border-t border-warnaAksen/30">
         <button
           @click="handleLogout"
-          class="w-full flex items-center justify-center text-slate-400 hover:text-warnaTombol px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-red-500/10"
+          class="w-full flex items-center justify-center text-slate-400 hover:text-warnaTombol px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer hover:bg-red-500/10"
         >
-          <LogOut class="w-5 h-5 flex-shrink-0" />
+          <LogOut class="w-4.5 h-4.5 flex-shrink-0" />
           <span v-show="sidebarTerbuka" class="ml-3">Keluar</span>
         </button>
       </div>
@@ -127,38 +140,27 @@ const menuList = [
         </button>
       </div>
 
-      <div class="p-4 border-b border-warnaAksen/20">
-        <div class="flex items-center space-x-3 bg-warnaUtama/50 p-2.5 rounded-xl border border-warnaAksen/20">
-          <div class="w-10 h-10 rounded-lg bg-warnaTombol/20 flex items-center justify-center text-warnaTombol">
-            <User class="w-5 h-5" />
-          </div>
-          <div>
-            <h4 class="text-xs font-bold text-white">{{ authStore.pengguna?.email?.split('@')[0] }}</h4>
-            <p class="text-[10px] text-slate-400 capitalize">{{ authStore.peran }}</p>
-          </div>
-        </div>
-      </div>
-
       <nav class="flex-grow p-4 space-y-1.5 overflow-y-auto">
-        <router-link
+        <button
           v-for="menu in menuList"
-          :key="menu.nama"
-          :to="menu.path"
-          @click="mobileSidebarTerbuka = false"
-          class="flex items-center text-slate-300 hover:text-white px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-          active-class="bg-warnaAksen text-white border border-warnaAksen"
+          :key="menu.id"
+          @click="setTab(menu.id)"
+          class="w-full flex items-center text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+          :class="{
+            'bg-warnaAksen text-white border border-warnaAksen': tabAktif === menu.id
+          }"
         >
-          <component :is="menu.ikon" class="w-5 h-5" />
+          <component :is="menu.ikon" class="w-4.5 h-4.5" />
           <span class="ml-3">{{ menu.nama }}</span>
-        </router-link>
+        </button>
       </nav>
 
       <div class="p-4 border-t border-warnaAksen/30">
         <button
           @click="handleLogout"
-          class="w-full flex items-center justify-center text-slate-400 hover:text-warnaTombol px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer hover:bg-red-500/10"
+          class="w-full flex items-center justify-center text-slate-400 hover:text-warnaTombol px-3 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer hover:bg-red-500/10"
         >
-          <LogOut class="w-5 h-5" />
+          <LogOut class="w-4.5 h-4.5" />
           <span class="ml-3">Keluar</span>
         </button>
       </div>
@@ -166,7 +168,8 @@ const menuList = [
 
     <!-- Main Content wrapper -->
     <div class="flex-grow flex flex-col min-w-0">
-      <!-- Top header for mobile / actions -->
+      
+      <!-- Top header -->
       <header class="h-16 bg-warnaSekunder/90 backdrop-blur-md border-b border-warnaAksen/30 flex items-center justify-between px-6 z-20 flex-shrink-0">
         <div class="flex items-center">
           <button 
@@ -176,12 +179,23 @@ const menuList = [
             <Menu class="w-6 h-6" />
           </button>
           <h2 class="text-sm md:text-base font-bold text-white tracking-wide">
-            Portal Administrasi
+            Panel Administrator &mdash; DenantaTS
           </h2>
         </div>
-        <div class="flex items-center space-x-3">
-          <span class="hidden sm:inline-block text-xs text-slate-400 bg-warnaUtama px-2.5 py-1 rounded-lg border border-warnaAksen/20">
-            Peran: <strong class="text-warnaTombol">Admin</strong>
+        
+        <div class="flex items-center space-x-4">
+          <!-- Notification Bell -->
+          <div 
+            class="relative cursor-pointer p-2 rounded-lg bg-warnaUtama/50 border border-warnaAksen/20 text-slate-400 hover:text-white transition-colors"
+            @click="setTab('log')"
+          >
+            <Bell class="w-4 h-4" />
+            <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-warnaTombol border border-warnaSekunder animate-pulse"></span>
+          </div>
+
+          <!-- Halo Greeting -->
+          <span class="text-xs text-slate-400 bg-warnaUtama px-2.5 py-1 rounded-lg border border-warnaAksen/20">
+            Halo, <strong class="text-warnaTombol text-slate-200">Admin</strong>
           </span>
         </div>
       </header>
@@ -190,6 +204,7 @@ const menuList = [
       <main class="flex-grow overflow-y-auto p-6 md:p-8 bg-warnaUtama relative">
         <slot />
       </main>
+
     </div>
   </div>
 </template>

@@ -1,157 +1,190 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Users, Car, Map, Settings, Trash2, Edit } from 'lucide-vue-next';
-import KartuUtama from '../umum/KartuUtama.vue';
-import TombolUtama from '../umum/TombolUtama.vue';
+import { Users, Truck, Navigation, Wallet, AlertTriangle } from 'lucide-vue-next';
+import { formatMataUang } from '../../bantuan/formatMataUang';
 
-const statistik = [
-  { nama: 'Total Orang Tua', jumlah: 124, ikon: Users, warna: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20' },
-  { nama: 'Total Supir', jumlah: 18, ikon: Car, warna: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
-  { nama: 'Total Rute Aktif', jumlah: 12, ikon: Map, warna: 'text-amber-400 bg-amber-500/10 border-amber-500/20' }
-];
+const emit = defineEmits<{
+  (e: 'ubah-tab', tab: string): void;
+}>();
 
-const daftarSupir = ref([
-  { id: 1, nama: 'Budi Santoso', plat: 'B 1234 DTS', rute: 'Depok - Jaksel', status: 'Aktif' },
-  { id: 2, nama: 'Joko Widodo', plat: 'B 5678 DTS', rute: 'Depok - Jaktim', status: 'Nonaktif' },
-  { id: 3, nama: 'Roni Setiawan', plat: 'B 9101 DTS', rute: 'Margonda - UI', status: 'Aktif' }
+// Mock Statistics
+const anakAktif = ref(120);
+const supirBertugas = ref(8);
+const perjalananBerlangsung = ref(2);
+const perjalananSelesai = ref(6);
+const pendapatanBulanIni = ref(475000 * 120); // 57,000,000
+
+// Mock Obstacle Warnings
+const kendalaTerakhir = ref([
+  { id: 'k-1', waktu: '07:05 WIB', supir: 'Budi Santoso', kendaraan: 'HiAce BA 1024 TA', tipe: 'macet', pesan: 'Kemacetan parah di depan Jln. Prof. M. Yamin, rute SD N 01 Padang terlambat 15 menit.' },
+  { id: 'k-2', waktu: '06:50 WIB', supir: 'Andi Pratama', kendaraan: 'Elf BA 9931 OP', tipe: 'absen_lokasi', pesan: 'Siswa Rafi Alief tidak ada di gerbang lokasi penjemputan.' }
 ]);
 </script>
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-white tracking-wide">Portal Admin</h2>
-        <p class="text-slate-400 text-xs mt-0.5">Kelola akun supir, orang tua, rute, dan tarif secara komprehensif.</p>
-      </div>
-      <TombolUtama varian="utama" ukuran="kecil" class="gap-1.5">
-        <Settings class="w-4 h-4" />
-        Pengaturan Sistem
-      </TombolUtama>
+    <div>
+      <h1 class="text-xl font-bold text-white uppercase tracking-wider">Dashboard Administrator</h1>
+      <p class="text-xs text-slate-400">Ringkasan status operasional armada dan rekonsiliasi billing harian.</p>
     </div>
 
-    <!-- Statistik Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div
-        v-for="stat in statistik"
-        :key="stat.nama"
-        class="bg-warnaSekunder border border-warnaAksen/30 rounded-xl p-5 flex items-center gap-4 transition-all duration-200 hover:border-warnaAksen/50"
-      >
-        <div class="p-3 rounded-lg border" :class="stat.warna">
-          <component :is="stat.ikon" class="w-6 h-6" />
+    <!-- 4 Widgets Row -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 1. Anak Aktif -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-5 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Siswa Aktif</span>
+          <Users class="w-4 h-4 text-warnaTombol" />
         </div>
-        <div>
-          <p class="text-xs text-slate-400">{{ stat.nama }}</p>
-          <p class="text-2xl font-black text-white mt-1">{{ stat.jumlah }}</p>
+        <p class="text-3xl font-black text-white font-mono">{{ anakAktif }}</p>
+        <p class="text-[10px] text-slate-500">Terdaftar di 4 sekolah mitra Kota Padang</p>
+      </div>
+
+      <!-- 2. Supir Bertugas -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-5 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Supir Bertugas</span>
+          <Truck class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-3xl font-black text-white font-mono">{{ supirBertugas }}</p>
+        <p class="text-[10px] text-slate-500">Semua armada berstatus Siap Bertugas</p>
+      </div>
+
+      <!-- 3. Status Perjalanan -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-5 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Status Rute Sesi Pagi</span>
+          <Navigation class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-2xl font-black text-white font-mono">{{ perjalananBerlangsung }}</span>
+          <span class="text-xs text-slate-500">Berlangsung</span>
+          <span class="text-slate-400 font-mono">/</span>
+          <span class="text-2xl font-black text-white font-mono">{{ perjalananSelesai }}</span>
+          <span class="text-xs text-slate-500">Selesai</span>
+        </div>
+        <p class="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+          75% Rute Selesai Diantar
+        </p>
+      </div>
+
+      <!-- 4. Pendapatan Bulan Ini -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-5 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Pemasukan Bulan Ini</span>
+          <Wallet class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-xl md:text-2xl font-black text-white font-mono text-warnaTombol">
+          {{ formatMataUang(pendapatanBulanIni) }}
+        </p>
+        <p class="text-[10px] text-emerald-400 font-semibold">Lunas & Rekonsiliasi Midtrans</p>
+      </div>
+    </div>
+
+    <!-- Alert / Kendala Banner -->
+    <div v-if="kendalaTerakhir.length > 0" class="space-y-3">
+      <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+        <AlertTriangle class="w-4.5 h-4.5 text-warnaTombol" />
+        Laporan Kendala Jalan Terbaru
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div 
+          v-for="k in kendalaTerakhir" 
+          :key="k.id"
+          class="bg-rose-950/20 border border-rose-500/20 p-4 rounded-xl flex items-start gap-3 relative text-xs text-slate-300"
+        >
+          <span class="absolute right-3 top-3 font-mono text-[9px] text-slate-500">{{ k.waktu }}</span>
+          <AlertTriangle class="w-5 h-5 text-rose-400 flex-shrink-0 mt-0.5" />
+          <div class="space-y-1">
+            <h4 class="font-bold text-white uppercase text-[10px]">Driver: {{ k.supir }} ({{ k.kendaraan }})</h4>
+            <p class="leading-relaxed text-[11px]">{{ k.pesan }}</p>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Tables & Details -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Left side: Table of Drivers -->
-      <div class="lg:col-span-2">
-        <KartuUtama judul="Manajemen Driver/Supir" subjudul="Pengelolaan status penugasan armada dan rute">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm border-collapse">
-              <thead>
-                <tr class="border-b border-warnaAksen/30 text-slate-400 font-medium">
-                  <th class="py-3 px-4">Nama</th>
-                  <th class="py-3 px-4">Plat Nomor</th>
-                  <th class="py-3 px-4">Rute Penugasan</th>
-                  <th class="py-3 px-4 text-center">Status</th>
-                  <th class="py-3 px-4 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-warnaAksen/20">
-                <tr
-                  v-for="supir in daftarSupir"
-                  :key="supir.id"
-                  class="text-slate-300 hover:bg-warnaUtama/30 transition-colors"
-                >
-                  <td class="py-3 px-4 font-bold text-white">{{ supir.nama }}</td>
-                  <td class="py-3 px-4 font-mono">{{ supir.plat }}</td>
-                  <td class="py-3 px-4">{{ supir.rute }}</td>
-                  <td class="py-3 px-4 text-center">
-                    <span
-                      class="px-2 py-0.5 rounded text-[10px] font-semibold inline-block"
-                      :class="supir.status === 'Aktif' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'"
-                    >
-                      {{ supir.status }}
-                    </span>
-                  </td>
-                  <td class="py-3 px-4 text-right">
-                    <div class="flex justify-end gap-1.5">
-                      <button class="p-1 hover:text-white transition-colors cursor-pointer" title="Edit">
-                        <Edit class="w-4 h-4" />
-                      </button>
-                      <button class="p-1 hover:text-red-500 transition-colors cursor-pointer" title="Hapus">
-                        <Trash2 class="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <template #footer>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-slate-400">Menampilkan 3 dari 18 Driver</span>
-              <TombolUtama varian="aksen" ukuran="kecil">
-                Tambah Supir Baru
-              </TombolUtama>
-            </div>
-          </template>
-        </KartuUtama>
+    <!-- Analytics Charts Row (Using Pure SVGs for extreme lightweight compatibility & aesthetics) -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Chart 1: Pelanggan Tren (Line Chart) -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 p-5 rounded-2xl space-y-4 shadow">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Tren Pertumbuhan Pelanggan (6 Bulan Terakhir)</h3>
+        <div class="w-full h-48 relative pt-2">
+          <!-- SVG Line Chart representation -->
+          <svg viewBox="0 0 500 150" class="w-full h-full text-warnaTombol">
+            <defs>
+              <linearGradient id="gradientLine" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#e94560" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#e94560" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Grid Lines -->
+            <line x1="50" y1="20" x2="450" y2="20" stroke="#16213e" stroke-width="1"/>
+            <line x1="50" y1="70" x2="450" y2="70" stroke="#16213e" stroke-width="1"/>
+            <line x1="50" y1="120" x2="450" y2="120" stroke="#16213e" stroke-width="1"/>
+            
+            <!-- Area Path -->
+            <path d="M 50 120 L 50 90 L 130 80 L 210 60 L 290 50 L 370 30 L 450 20 L 450 120 Z" fill="url(#gradientLine)" />
+            
+            <!-- Line Path -->
+            <path d="M 50 90 L 130 80 L 210 60 L 290 50 L 370 30 L 450 20" fill="none" stroke="#e94560" stroke-width="3" stroke-linecap="round" />
+            
+            <!-- Points -->
+            <circle cx="50" cy="90" r="4" fill="#fff" stroke="#e94560" stroke-width="2"/>
+            <circle cx="130" cy="80" r="4" fill="#fff" stroke="#e94560" stroke-width="2"/>
+            <circle cx="210" cy="60" r="4" fill="#fff" stroke="#e94560" stroke-width="2"/>
+            <circle cx="290" cy="50" r="4" fill="#fff" stroke="#e94560" stroke-width="2"/>
+            <circle cx="370" cy="30" r="4" fill="#fff" stroke="#e94560" stroke-width="2"/>
+            <circle cx="450" cy="20" r="4" fill="#fff" stroke="#e94560" stroke-width="2"/>
+
+            <!-- Axes Text labels -->
+            <text x="50" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">Feb</text>
+            <text x="130" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">Mar</text>
+            <text x="210" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">Apr</text>
+            <text x="290" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">Mei</text>
+            <text x="370" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">Jun</text>
+            <text x="450" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">Jul</text>
+          </svg>
+        </div>
       </div>
 
-      <!-- Right side: Notifications/Quick config -->
-      <div class="space-y-6">
-        <KartuUtama judul="Portal Konfigurasi API" subjudul="Pastikan token dan kredensial valid">
-          <div class="space-y-4">
-            <div class="space-y-2">
-              <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Supabase Client</label>
-              <div class="flex items-center justify-between p-2 bg-warnaUtama/50 border border-warnaAksen/30 rounded-lg text-xs">
-                <span class="text-slate-300 font-mono">SUPABASE_URL</span>
-                <span class="text-emerald-400 font-bold">Terhubung</span>
-              </div>
-            </div>
+      <!-- Chart 2: Pendapatan Bulanan (Bar Chart) -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 p-5 rounded-2xl space-y-4 shadow">
+        <h3 class="text-sm font-bold text-white uppercase tracking-wider">Pemasukan Bulanan (Juta Rupiah)</h3>
+        <div class="w-full h-48 relative pt-2">
+          <!-- SVG Bar Chart -->
+          <svg viewBox="0 0 500 150" class="w-full h-full">
+            <!-- Grid Lines -->
+            <line x1="50" y1="20" x2="450" y2="20" stroke="#16213e" stroke-width="1"/>
+            <line x1="50" y1="70" x2="450" y2="70" stroke="#16213e" stroke-width="1"/>
+            <line x1="50" y1="120" x2="450" y2="120" stroke="#16213e" stroke-width="1"/>
 
-            <div class="space-y-2">
-              <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Gateway Midtrans</label>
-              <div class="flex items-center justify-between p-2 bg-warnaUtama/50 border border-warnaAksen/30 rounded-lg text-xs">
-                <span class="text-slate-300 font-mono">MIDTRANS_SANDBOX</span>
-                <span class="text-emerald-400 font-bold">Terhubung</span>
-              </div>
-            </div>
+            <!-- Bars -->
+            <!-- Feb: 30 Juta -->
+            <rect x="70" y="70" width="24" height="50" rx="3" fill="#0f3460" class="hover:fill-warnaTombol transition-colors duration-200" />
+            <!-- Mar: 35 Juta -->
+            <rect x="140" y="60" width="24" height="60" rx="3" fill="#0f3460" class="hover:fill-warnaTombol transition-colors duration-200" />
+            <!-- Apr: 42 Juta -->
+            <rect x="210" y="50" width="24" height="70" rx="3" fill="#0f3460" class="hover:fill-warnaTombol transition-colors duration-200" />
+            <!-- Mei: 46 Juta -->
+            <rect x="280" y="45" width="24" height="75" rx="3" fill="#0f3460" class="hover:fill-warnaTombol transition-colors duration-200" />
+            <!-- Jun: 52 Juta -->
+            <rect x="350" y="35" width="24" height="85" rx="3" fill="#0f3460" class="hover:fill-warnaTombol transition-colors duration-200" />
+            <!-- Jul: 57 Juta -->
+            <rect x="420" y="25" width="24" height="95" rx="3" fill="#e94560" class="hover:fill-opacity-95 transition-colors duration-200" />
 
-            <div class="space-y-2">
-              <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">WhatsApp API</label>
-              <div class="flex items-center justify-between p-2 bg-warnaUtama/50 border border-warnaAksen/30 rounded-lg text-xs">
-                <span class="text-slate-300 font-mono">WHATSAPP_API</span>
-                <span class="text-emerald-400 font-bold">Terhubung</span>
-              </div>
-            </div>
-          </div>
-        </KartuUtama>
-
-        <KartuUtama judul="Aktifitas Sistem Terkini">
-          <div class="space-y-3 text-xs text-slate-400">
-            <div class="flex gap-2">
-              <span class="text-warnaTombol font-bold">[18:25]</span>
-              <p><strong class="text-slate-300">Driver Budi</strong> memperbarui status koordinat GPS (Rute Depok).</p>
-            </div>
-            <div class="flex gap-2">
-              <span class="text-warnaTombol font-bold">[18:20]</span>
-              <p><strong class="text-slate-300">Siswa Rafi</strong> berhasil dikonfirmasi jemput oleh Driver.</p>
-            </div>
-            <div class="flex gap-2">
-              <span class="text-warnaTombol font-bold">[18:12]</span>
-              <p><strong class="text-slate-300">Orang Tua</strong> melunasi tagihan bulan Juli senilai Rp 450.000.</p>
-            </div>
-          </div>
-        </KartuUtama>
+            <!-- Axes text -->
+            <text x="82" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">30 Jt</text>
+            <text x="152" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">35 Jt</text>
+            <text x="222" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">42 Jt</text>
+            <text x="292" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">46 Jt</text>
+            <text x="362" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold">52 Jt</text>
+            <text x="432" y="140" fill="#94a3b8" font-size="9" text-anchor="middle" font-weight="bold" class="fill-warnaTombol">57 Jt</text>
+          </svg>
+        </div>
       </div>
+
     </div>
   </div>
 </template>

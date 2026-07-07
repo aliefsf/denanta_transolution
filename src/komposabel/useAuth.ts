@@ -1,13 +1,17 @@
 import { ref } from 'vue';
 import { supabase } from '../layanan/supabase';
 
+function harusAdaSupabase() {
+  if (!supabase) {
+    throw new Error('Supabase tidak dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di file .env');
+  }
+  return supabase;
+}
+
 export function useAuth() {
   const sedangMemuat = ref(false);
   const error = ref<string | null>(null);
 
-  /**
-   * Mendaftarkan pengguna baru ke Supabase Auth
-   */
   async function daftar(
     email: string,
     kataSandi: string,
@@ -18,7 +22,8 @@ export function useAuth() {
     sedangMemuat.value = true;
     error.value = null;
     try {
-      const { data, error: errSignUp } = await supabase.auth.signUp({
+      const client = harusAdaSupabase();
+      const { data, error: errSignUp } = await client.auth.signUp({
         email,
         password: kataSandi,
         options: {
@@ -30,7 +35,6 @@ export function useAuth() {
           emailRedirectTo: `${window.location.origin}/login`
         }
       });
-
       if (errSignUp) throw errSignUp;
       return data;
     } catch (err: any) {
@@ -41,18 +45,15 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Masuk menggunakan email & kata sandi
-   */
   async function masuk(email: string, kataSandi: string) {
     sedangMemuat.value = true;
     error.value = null;
     try {
-      const { data, error: errSignIn } = await supabase.auth.signInWithPassword({
+      const client = harusAdaSupabase();
+      const { data, error: errSignIn } = await client.auth.signInWithPassword({
         email,
         password: kataSandi,
       });
-
       if (errSignIn) throw errSignIn;
       return data;
     } catch (err: any) {
@@ -63,14 +64,12 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Keluar dari sesi aktif
-   */
   async function keluar() {
     sedangMemuat.value = true;
     error.value = null;
     try {
-      const { error: errSignOut } = await supabase.auth.signOut();
+      const client = harusAdaSupabase();
+      const { error: errSignOut } = await client.auth.signOut();
       if (errSignOut) throw errSignOut;
     } catch (err: any) {
       error.value = err.message || 'Terjadi kesalahan saat keluar';
@@ -80,14 +79,12 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Mengirimkan tautan reset kata sandi ke email pengguna
-   */
   async function aturUlangKataSandi(email: string) {
     sedangMemuat.value = true;
     error.value = null;
     try {
-      const { data, error: errReset } = await supabase.auth.resetPasswordForEmail(email, {
+      const client = harusAdaSupabase();
+      const { data, error: errReset } = await client.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/konfirmasi-reset`
       });
       if (errReset) throw errReset;
@@ -100,14 +97,12 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Memperbarui kata sandi dengan yang baru
-   */
   async function perbaruiKataSandi(kataSandiBaru: string) {
     sedangMemuat.value = true;
     error.value = null;
     try {
-      const { data, error: errUpdate } = await supabase.auth.updateUser({
+      const client = harusAdaSupabase();
+      const { data, error: errUpdate } = await client.auth.updateUser({
         password: kataSandiBaru
       });
       if (errUpdate) throw errUpdate;
@@ -120,25 +115,20 @@ export function useAuth() {
     }
   }
 
-  /**
-   * Mengambil sesi pengguna aktif saat ini
-   */
   async function ambilPengguna() {
+    if (!supabase) return null;
     const { data: { user } } = await supabase.auth.getUser();
     return user;
   }
 
-  /**
-   * Mengambil peran pengguna dari tabel database 'pengguna'
-   */
   async function ambilPeran(uid: string): Promise<string> {
+    if (!supabase) return 'tamu';
     try {
       const { data, error: errPeran } = await supabase
         .from('pengguna')
         .select('peran')
         .eq('id', uid)
         .single();
-      
       if (errPeran || !data) return 'tamu';
       return data.peran;
     } catch {
