@@ -3,9 +3,21 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../penyimpanan/authStore';
 import { 
-  LayoutDashboard, UserCheck, Map, LogOut, 
-  Menu, X, User, Bus, ChevronLeft, ChevronRight 
+  LayoutDashboard, ClipboardList, History, User, LogOut, 
+  Menu, X, Bus, ChevronLeft, ChevronRight, CheckCircle2, ShieldAlert
 } from 'lucide-vue-next';
+
+interface Props {
+  tabAktif: string;
+  siapKerja: boolean;
+}
+
+defineProps<Props>();
+
+const emit = defineEmits<{
+  (e: 'ubah-tab', tab: string): void;
+  (e: 'ubah-siap', status: boolean): void;
+}>();
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -27,17 +39,24 @@ const handleLogout = async () => {
 };
 
 const menuList = [
-  { nama: 'Dashboard', path: '/supir', ikon: LayoutDashboard },
-  { nama: 'Absensi Siswa', path: '/supir', ikon: UserCheck },
-  { nama: 'Rute Jalan', path: '/supir', ikon: Map },
+  { nama: 'Dashboard', id: 'dashboard', ikon: LayoutDashboard },
+  { nama: 'Tugas Hari Ini', id: 'tugas', ikon: ClipboardList },
+  { nama: 'Riwayat Perjalanan', id: 'riwayat', ikon: History },
+  { nama: 'Profil Saya', id: 'profil', ikon: User }
 ];
+
+const setTab = (id: string) => {
+  emit('ubah-tab', id);
+  mobileSidebarTerbuka.value = false;
+};
 </script>
 
 <template>
   <div class="flex h-screen bg-warnaUtama text-slate-100 overflow-hidden">
+    
     <!-- Desktop Sidebar -->
     <aside 
-      class="hidden md:flex flex-col bg-warnaSekunder border-r border-warnaAksen/30 transition-all duration-300 relative z-30"
+      class="hidden md:flex flex-col bg-warnaSekunder border-r border-warnaAksen/30 transition-all duration-300 relative z-30 flex-shrink-0"
       :class="sidebarTerbuka ? 'w-64' : 'w-20'"
     >
       <!-- Logo Header -->
@@ -53,14 +72,14 @@ const menuList = [
         </div>
       </div>
 
-      <!-- User Card -->
+      <!-- User Info Card -->
       <div class="p-4 border-b border-warnaAksen/20" v-show="sidebarTerbuka">
         <div class="flex items-center space-x-3 bg-warnaUtama/50 p-2.5 rounded-xl border border-warnaAksen/20">
           <div class="w-10 h-10 rounded-lg bg-warnaTombol/20 flex items-center justify-center text-warnaTombol">
             <User class="w-5 h-5" />
           </div>
           <div class="overflow-hidden">
-            <h4 class="text-xs font-bold text-white truncate">{{ authStore.pengguna?.email?.split('@')[0] }}</h4>
+            <h4 class="text-xs font-bold text-white truncate">Budi Santoso</h4>
             <p class="text-[10px] text-slate-400 capitalize">{{ authStore.peran }}</p>
           </div>
         </div>
@@ -68,16 +87,18 @@ const menuList = [
 
       <!-- Navigation Menu -->
       <nav class="flex-grow p-4 space-y-1.5 overflow-y-auto">
-        <router-link
+        <button
           v-for="menu in menuList"
-          :key="menu.nama"
-          :to="menu.path"
-          class="flex items-center text-slate-300 hover:text-white px-3 py-2.5 rounded-xl text-sm font-medium transition-all group"
-          active-class="bg-warnaAksen text-white shadow-lg border border-warnaAksen"
+          :key="menu.id"
+          @click="setTab(menu.id)"
+          class="w-full flex items-center text-slate-300 hover:text-white px-3 py-2.5 rounded-xl text-sm font-medium transition-all group cursor-pointer"
+          :class="{
+            'bg-warnaAksen text-white border border-warnaAksen shadow-lg': tabAktif === menu.id
+          }"
         >
           <component :is="menu.ikon" class="w-5 h-5 flex-shrink-0 group-hover:scale-110 transition-transform" />
           <span v-show="sidebarTerbuka" class="ml-3 transition-opacity duration-300">{{ menu.nama }}</span>
-        </router-link>
+        </button>
       </nav>
 
       <!-- Collapse Trigger Button -->
@@ -101,7 +122,7 @@ const menuList = [
       </div>
     </aside>
 
-    <!-- Mobile Sidebar Backdrop -->
+    <!-- Mobile Sidebar Drawer Backdrop -->
     <div 
       v-if="mobileSidebarTerbuka" 
       @click="toggleMobileSidebar" 
@@ -131,24 +152,25 @@ const menuList = [
             <User class="w-5 h-5" />
           </div>
           <div>
-            <h4 class="text-xs font-bold text-white">{{ authStore.pengguna?.email?.split('@')[0] }}</h4>
+            <h4 class="text-xs font-bold text-white">Budi Santoso</h4>
             <p class="text-[10px] text-slate-400 capitalize">{{ authStore.peran }}</p>
           </div>
         </div>
       </div>
 
       <nav class="flex-grow p-4 space-y-1.5 overflow-y-auto">
-        <router-link
+        <button
           v-for="menu in menuList"
-          :key="menu.nama"
-          :to="menu.path"
-          @click="mobileSidebarTerbuka = false"
-          class="flex items-center text-slate-300 hover:text-white px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
-          active-class="bg-warnaAksen text-white border border-warnaAksen"
+          :key="menu.id"
+          @click="setTab(menu.id)"
+          class="w-full flex items-center text-slate-300 hover:text-white px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer"
+          :class="{
+            'bg-warnaAksen text-white border border-warnaAksen': tabAktif === menu.id
+          }"
         >
           <component :is="menu.ikon" class="w-5 h-5" />
           <span class="ml-3">{{ menu.nama }}</span>
-        </router-link>
+        </button>
       </nav>
 
       <div class="p-4 border-t border-warnaAksen/30">
@@ -164,7 +186,8 @@ const menuList = [
 
     <!-- Main Content wrapper -->
     <div class="flex-grow flex flex-col min-w-0">
-      <!-- Top header for mobile / actions -->
+      
+      <!-- Top header with status kehadiran toggle -->
       <header class="h-16 bg-warnaSekunder/90 backdrop-blur-md border-b border-warnaAksen/30 flex items-center justify-between px-6 z-20 flex-shrink-0">
         <div class="flex items-center">
           <button 
@@ -174,12 +197,25 @@ const menuList = [
             <Menu class="w-6 h-6" />
           </button>
           <h2 class="text-sm md:text-base font-bold text-white tracking-wide">
-            Panel Kemudi Supir
+            Panel Kemudi Supir &mdash; DenantaTS
           </h2>
         </div>
-        <div class="flex items-center space-x-3">
+        
+        <div class="flex items-center space-x-4">
+          <!-- Availability Kehadiran Toggle -->
+          <button
+            @click="emit('ubah-siap', !siapKerja)"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer"
+            :class="siapKerja ? 'bg-emerald-950/20 border-emerald-500 text-emerald-400' : 'bg-rose-950/20 border-rose-500 text-rose-400'"
+          >
+            <CheckCircle2 v-if="siapKerja" class="w-3.5 h-3.5" />
+            <ShieldAlert v-else class="w-3.5 h-3.5" />
+            <span>{{ siapKerja ? 'Siap Bertugas' : 'Tidak Siap' }}</span>
+          </button>
+
+          <!-- Halo Greeting -->
           <span class="hidden sm:inline-block text-xs text-slate-400 bg-warnaUtama px-2.5 py-1 rounded-lg border border-warnaAksen/20">
-            Peran: <strong class="text-warnaTombol">Supir</strong>
+            Halo, <strong class="text-warnaTombol text-slate-200">Budi Santoso</strong>
           </span>
         </div>
       </header>
@@ -188,6 +224,7 @@ const menuList = [
       <main class="flex-grow overflow-y-auto p-6 md:p-8 bg-warnaUtama relative">
         <slot />
       </main>
+
     </div>
   </div>
 </template>

@@ -1,146 +1,168 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Play, Square, MapPin, UserCheck } from 'lucide-vue-next';
+import { ClipboardList, UserCheck, Play, Bell, AlertTriangle } from 'lucide-vue-next';
 import KartuUtama from '../umum/KartuUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 
-const melacak = ref(false);
-const kordinatSimulasi = ref({ lat: -6.3725, lng: 106.8294 });
-const anakJemputan = ref([
-  { id: 1, nama: 'Rafi Alief', alamat: 'Kost Widya, Kukusan, Depok', status: 'Belum Dijemput' },
-  { id: 2, nama: 'Aisyah Putri', alamat: 'Perumahan Pesona Khayangan, Depok', status: 'Sudah Dijemput' }
-]);
+interface Props {
+  siapKerja: boolean;
+}
 
-const togglePelacakan = () => {
-  melacak.value = !melacak.value;
-  if (melacak.value) {
-    // Jalankan interval simulasi pergeseran GPS
-    const interval = setInterval(() => {
-      if (!melacak.value) {
-        clearInterval(interval);
-        return;
-      }
-      kordinatSimulasi.value.lat += (Math.random() - 0.5) * 0.0005;
-      kordinatSimulasi.value.lng += (Math.random() - 0.5) * 0.0005;
-    }, 3000);
-  }
-};
+defineProps<Props>();
 
-const konfirmasiJemput = (id: number) => {
-  const anak = anakJemputan.value.find(a => a.id === id);
-  if (anak) {
-    anak.status = anak.status === 'Belum Dijemput' ? 'Sudah Dijemput' : 'Belum Dijemput';
-  }
+const emit = defineEmits<{
+  (e: 'ubah-tab', tab: string): void;
+  (e: 'ubah-siap', status: boolean): void;
+}>();
+
+// Mock metrics
+const jmpPagiCount = ref(3);
+const jmpSoreCount = ref(3);
+
+const tugasPagiSelesai = ref(false);
+const tugasSoreSelesai = ref(false);
+
+const adaNotifTugasBaru = ref(true);
+
+const mulaiBertugas = () => {
+  emit('ubah-siap', true);
+  emit('ubah-tab', 'tugas');
 };
 </script>
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-white tracking-wide">Dashboard Supir</h2>
-        <p class="text-slate-400 text-xs mt-0.5">Kirim lokasi GPS aktif dan kelola daftar jemputan siswa.</p>
+    <!-- Pop-up Alert Tugas Baru (whatsapp integrated simulation) -->
+    <div 
+      v-if="adaNotifTugasBaru" 
+      class="bg-warnaSekunder border border-warnaTombol/40 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg text-xs relative overflow-hidden"
+    >
+      <div class="absolute left-0 top-0 bottom-0 w-1 bg-warnaTombol"></div>
+      <div class="flex items-start gap-3">
+        <Bell class="w-8 h-8 text-warnaTombol flex-shrink-0 animate-swing" />
+        <div class="space-y-1 text-slate-300">
+          <h4 class="font-bold text-white text-sm">Pemberitahuan Tugas Baru Diterima!</h4>
+          <p class="leading-relaxed">
+            Anda menerima penugasan jemputan baru untuk sesi <strong>Pagi SD N 01 Padang</strong>. Rute optimal telah diperbarui otomatis.
+          </p>
+        </div>
       </div>
-      <span
-        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
-        :class="melacak ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'"
-      >
-        <span class="w-1.5 h-1.5 rounded-full" :class="melacak ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'"></span>
-        {{ melacak ? 'GPS Aktif' : 'GPS Mati' }}
-      </span>
+      <div class="flex gap-2 w-full md:w-auto">
+        <TombolUtama varian="garis-luar" class="text-[11px] py-1.5 w-full md:w-auto" @click="adaNotifTugasBaru = false">
+          Tutup
+        </TombolUtama>
+        <TombolUtama varian="utama" class="text-[11px] py-1.5 w-full md:w-auto" @click="emit('ubah-tab', 'tugas')">
+          Lihat Tugas
+        </TombolUtama>
+      </div>
     </div>
 
-    <!-- Main Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Left: Tracking Controller -->
-      <div class="lg:col-span-1 space-y-6">
-        <KartuUtama judul="Kontrol Pelacakan" subjudul="Kirim kordinat lokasi ke dashboard orang tua">
-          <div class="space-y-6">
-            <div class="p-5 bg-warnaUtama/50 border border-warnaAksen/20 rounded-xl space-y-4">
-              <div>
-                <p class="text-xs text-slate-400">Garis Lintang (Latitude)</p>
-                <p class="text-base font-mono text-white mt-0.5">{{ kordinatSimulasi.lat.toFixed(6) }}</p>
-              </div>
-              <div>
-                <p class="text-xs text-slate-400">Garis Bujur (Longitude)</p>
-                <p class="text-base font-mono text-white mt-0.5">{{ kordinatSimulasi.lng.toFixed(6) }}</p>
-              </div>
-            </div>
-
-            <div class="flex flex-col gap-2">
-              <TombolUtama
-                :varian="melacak ? 'bahaya' : 'utama'"
-                class="w-full gap-2 py-3"
-                @click="togglePelacakan"
-              >
-                <component :is="melacak ? Square : Play" class="w-4 h-4 fill-current" />
-                {{ melacak ? 'Matikan Pengiriman GPS' : 'Mulai Kirim GPS Lokasi' }}
-              </TombolUtama>
-              <p class="text-[10px] text-slate-400 text-center leading-relaxed">
-                *Mengaktifkan GPS akan mengonsumsi daya baterai. Harap sambungkan ponsel ke pengisi daya.
-              </p>
-            </div>
-          </div>
-        </KartuUtama>
-
-        <KartuUtama judul="Informasi Armada">
-          <div class="space-y-3 text-sm">
-            <div class="flex justify-between border-b border-warnaAksen/20 pb-2">
-              <span class="text-slate-400">Nama Armada:</span>
-              <span class="text-white font-medium">Denanta Depok-1</span>
-            </div>
-            <div class="flex justify-between border-b border-warnaAksen/20 pb-2">
-              <span class="text-slate-400">Nomor Polisi:</span>
-              <span class="text-white font-medium">B 1234 DTS</span>
-            </div>
-            <div class="flex justify-between pb-1">
-              <span class="text-slate-400">Kapasitas Kursi:</span>
-              <span class="text-white font-medium">7 Penumpang</span>
-            </div>
-          </div>
-        </KartuUtama>
+    <!-- Summary Indicators -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- 1. Jemput Pagi -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-4 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Jumlah Siswa Jemput Pagi</span>
+          <ClipboardList class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-3xl font-black text-white tracking-wide">
+          {{ jmpPagiCount }}
+          <span class="text-xs font-normal text-slate-400">anak</span>
+        </p>
+        <p class="text-[10px] text-slate-500">Tujuan: SD N 01 Padang & SMP N 1 Padang</p>
       </div>
 
-      <!-- Right: Children Pick up List -->
-      <div class="lg:col-span-2">
-        <KartuUtama judul="Daftar Antar-Jemput Siswa" subjudul="Centang siswa yang telah berhasil dijemput">
-          <div class="space-y-4">
-            <div
-              v-for="anak in anakJemputan"
-              :key="anak.id"
-              class="p-4 bg-warnaUtama/30 border border-warnaAksen/20 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-200 hover:border-warnaAksen/40"
+      <!-- 2. Antar Sore -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-4 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Jumlah Siswa Antar Sore</span>
+          <ClipboardList class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-3xl font-black text-white tracking-wide">
+          {{ jmpSoreCount }}
+          <span class="text-xs font-normal text-slate-400">anak</span>
+        </p>
+        <p class="text-[10px] text-slate-500">Penjemputan sekolah mulai jam 13:00</p>
+      </div>
+
+      <!-- 3. Status Kehadiran -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-4 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Status Kehadiran</span>
+          <UserCheck class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-lg font-bold" :class="siapKerja ? 'text-emerald-400' : 'text-rose-400'">
+          {{ siapKerja ? 'SIAP BERTUGAS' : 'TIDAK AKTIF' }}
+        </p>
+        <div class="pt-0.5">
+          <button 
+            @click="emit('ubah-siap', !siapKerja)" 
+            class="text-[10px] font-bold text-warnaTombol hover:underline"
+          >
+            Ubah Status Kehadiran
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sessions Summary Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      <!-- Pagi Sesi -->
+      <KartuUtama judul="Sesi Jemputan Pagi (06:00 - 07:15)" subjudul="Sekolah Tujuan: SD N 01 Padang">
+        <div class="space-y-4 text-xs">
+          <div class="flex justify-between border-b border-warnaAksen/10 pb-2">
+            <span class="text-slate-400">Total Rute Titik Jemput:</span>
+            <span class="text-white font-bold">3 Rumah Kediaman</span>
+          </div>
+          <div class="flex justify-between border-b border-warnaAksen/10 pb-2">
+            <span class="text-slate-400">Status Sesi Hari Ini:</span>
+            <span class="font-bold uppercase" :class="tugasPagiSelesai ? 'text-emerald-400' : 'text-amber-400'">
+              {{ tugasPagiSelesai ? 'Lengkap Selesai' : 'Belum Mulai' }}
+            </span>
+          </div>
+          
+          <div v-if="!siapKerja" class="flex gap-2 text-[10px] text-rose-300 bg-rose-950/20 p-3 rounded-lg border border-rose-500/20">
+            <AlertTriangle class="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span>Aktifkan status siap bertugas Anda terlebih dahulu sebelum memulai navigasi jemputan anak.</span>
+          </div>
+          
+          <div class="pt-2 flex justify-end">
+            <TombolUtama varian="utama" class="gap-1.5 text-xs py-2" @click="mulaiBertugas">
+              <Play class="w-3.5 h-3.5" />
+              Mulai Tugas Pagi
+            </TombolUtama>
+          </div>
+        </div>
+      </KartuUtama>
+
+      <!-- Sore Sesi -->
+      <KartuUtama judul="Sesi Jemputan Sore (12:45 - 14:15)" subjudul="Sekolah Asal: SD N 01 Padang & SMP N 1 Padang">
+        <div class="space-y-4 text-xs">
+          <div class="flex justify-between border-b border-warnaAksen/10 pb-2">
+            <span class="text-slate-400">Total Rute Titik Antar:</span>
+            <span class="text-white font-bold">3 Siswa</span>
+          </div>
+          <div class="flex justify-between border-b border-warnaAksen/10 pb-2">
+            <span class="text-slate-400">Status Sesi Hari Ini:</span>
+            <span class="font-bold uppercase" :class="tugasSoreSelesai ? 'text-emerald-400' : 'text-amber-400'">
+              {{ tugasSoreSelesai ? 'Lengkap Selesai' : 'Belum Mulai' }}
+            </span>
+          </div>
+
+          <div class="pt-2 flex justify-end">
+            <TombolUtama 
+              varian="utama" 
+              class="gap-1.5 text-xs py-2" 
+              @click="mulaiBertugas"
             >
-              <div class="space-y-1">
-                <div class="flex items-center gap-2">
-                  <p class="text-base font-bold text-white">{{ anak.nama }}</p>
-                  <span
-                    class="px-2 py-0.5 rounded text-[10px] font-semibold"
-                    :class="anak.status === 'Sudah Dijemput' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'"
-                  >
-                    {{ anak.status }}
-                  </span>
-                </div>
-                <p class="text-xs text-slate-400 flex items-center gap-1">
-                  <MapPin class="w-3.5 h-3.5 text-warnaTombol" />
-                  {{ anak.alamat }}
-                </p>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <TombolUtama
-                  :varian="anak.status === 'Sudah Dijemput' ? 'garis-luar' : 'aksen'"
-                  ukuran="kecil"
-                  class="gap-1.5"
-                  @click="konfirmasiJemput(anak.id)"
-                >
-                  <UserCheck class="w-4 h-4" />
-                  {{ anak.status === 'Sudah Dijemput' ? 'Batalkan' : 'Konfirmasi Jemput' }}
-                </TombolUtama>
-              </div>
-            </div>
+              <Play class="w-3.5 h-3.5" />
+              Mulai Tugas Sore
+            </TombolUtama>
           </div>
-        </KartuUtama>
-      </div>
+        </div>
+      </KartuUtama>
+
     </div>
   </div>
 </template>
