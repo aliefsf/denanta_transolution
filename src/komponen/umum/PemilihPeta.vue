@@ -33,10 +33,28 @@ let peta: L.Map | null = null;
 let penanda: L.Marker | null = null;
 
 const koordinatAktif = ref({ lat: props.lintang, lng: props.bujur });
+const errorBatas = ref(false);
+
+// Batas wilayah operasional Kota Padang
+const apakahDalamKotaPadang = (lat: number, lng: number) => {
+  return lat <= -0.75 && lat >= -1.15 && lng >= 100.25 && lng <= 100.55;
+};
 
 // Simulasi geocoding sederhana (peta ke alamat teks) untuk Kota Padang
 const dapatkanNamaAlamat = (lat: number, lng: number) => {
   return `Jalan Prof. M. Yamin, dekat kordinat (${lat.toFixed(5)}, ${lng.toFixed(5)}), Kota Padang`;
+};
+
+const handleUpdateLokasi = (lat: number, lng: number) => {
+  koordinatAktif.value = { lat, lng };
+  const valid = apakahDalamKotaPadang(lat, lng);
+  errorBatas.value = !valid;
+  
+  emit('pilih-lokasi', {
+    lintang: lat,
+    bujur: lng,
+    alamat: valid ? dapatkanNamaAlamat(lat, lng) : 'LOKASI DI LUAR BATAS OPERASIONAL KOTA PADANG'
+  });
 };
 
 onMounted(() => {
@@ -61,32 +79,18 @@ onMounted(() => {
   penanda.on('dragend', () => {
     if (!penanda) return;
     const pos = penanda.getLatLng();
-    koordinatAktif.value = { lat: pos.lat, lng: pos.lng };
-    emit('pilih-lokasi', {
-      lintang: pos.lat,
-      bujur: pos.lng,
-      alamat: dapatkanNamaAlamat(pos.lat, pos.lng)
-    });
+    handleUpdateLokasi(pos.lat, pos.lng);
   });
 
   // Dengarkan event klik peta untuk memindahkan penanda
   peta.on('click', (e: L.LeafletMouseEvent) => {
     if (!penanda) return;
     penanda.setLatLng(e.latlng);
-    koordinatAktif.value = { lat: e.latlng.lat, lng: e.latlng.lng };
-    emit('pilih-lokasi', {
-      lintang: e.latlng.lat,
-      bujur: e.latlng.lng,
-      alamat: dapatkanNamaAlamat(e.latlng.lat, e.latlng.lng)
-    });
+    handleUpdateLokasi(e.latlng.lat, e.latlng.lng);
   });
 
   // Emit inisialisasi pertama kali
-  emit('pilih-lokasi', {
-    lintang: koordinatAktif.value.lat,
-    bujur: koordinatAktif.value.lng,
-    alamat: dapatkanNamaAlamat(koordinatAktif.value.lat, koordinatAktif.value.lng)
-  });
+  handleUpdateLokasi(koordinatAktif.value.lat, koordinatAktif.value.lng);
 });
 
 onUnmounted(() => {
@@ -103,13 +107,21 @@ onUnmounted(() => {
       ref="wadahPeta" 
       :style="{ height: tinggi }" 
       class="w-full rounded-xl border border-warnaAksen/30 overflow-hidden shadow-inner relative z-10"
+      :class="{ 'border-rose-500': errorBatas }"
     ></div>
     
     <!-- Info Koordinat -->
-    <div class="flex items-center justify-between text-[11px] text-slate-400 bg-warnaSekunder/50 px-3 py-1.5 rounded-lg border border-warnaAksen/20">
-      <span>Lintang: <strong class="text-slate-200 font-mono">{{ koordinatAktif.lat.toFixed(6) }}</strong></span>
-      <span>Bujur: <strong class="text-slate-200 font-mono">{{ koordinatAktif.lng.toFixed(6) }}</strong></span>
-      <span class="text-warnaTombol font-semibold">Geser pin untuk ubah lokasi</span>
+    <div 
+      class="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] px-3 py-2 rounded-lg border transition-colors duration-200"
+      :class="errorBatas ? 'bg-rose-950/20 border-rose-500/30 text-rose-400' : 'bg-warnaSekunder/50 border-warnaAksen/20 text-slate-400'"
+    >
+      <div class="flex items-center gap-4">
+        <span>Lintang: <strong class="font-mono text-slate-200">{{ koordinatAktif.lat.toFixed(6) }}</strong></span>
+        <span>Bujur: <strong class="font-mono text-slate-200">{{ koordinatAktif.lng.toFixed(6) }}</strong></span>
+      </div>
+      <span v-if="errorBatas" class="font-bold uppercase tracking-wider text-[10px] animate-pulse">Di luar batas Kota Padang!</span>
+      <span v-else class="text-warnaTombol font-semibold">Geser pin untuk ubah lokasi</span>
     </div>
   </div>
 </template>
+

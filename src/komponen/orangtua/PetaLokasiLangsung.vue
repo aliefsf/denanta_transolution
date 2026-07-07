@@ -108,7 +108,7 @@ onMounted(() => {
   penandaBus = L.marker(posAwal, { icon: ikonBus }).addTo(peta)
     .bindPopup('<strong class="text-slate-800">Bus Sekolah - DenantaTS</strong><br><span class="text-xs text-slate-500">Kec. 45 KM/Jam</span>');
 
-  // Interval Simulasi Pergerakan Bus
+  // Interval Simulasi Pergerakan Bus - Diupdate setiap 5 detik
   intervalSimulasi = setInterval(() => {
     langkahAktif = (langkahAktif + 1) % totalLangkah;
     const progress = langkahAktif / totalLangkah;
@@ -117,7 +117,7 @@ onMounted(() => {
     if (penandaBus) {
       penandaBus.setLatLng(koordinatBaru);
     }
-  }, 1500);
+  }, 5000);
 });
 
 onUnmounted(() => {
