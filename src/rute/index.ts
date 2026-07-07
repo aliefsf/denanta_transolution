@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import HalamanTamu from '../halaman/HalamanTamu.vue';
+import HalamanUtama from '../halaman/HalamanUtama.vue';
+import HalamanTentang from '../halaman/HalamanTentang.vue';
+import HalamanBerlangganan from '../halaman/HalamanBerlangganan.vue';
 import HalamanOrangTua from '../halaman/HalamanOrangTua.vue';
 import HalamanSupir from '../halaman/HalamanSupir.vue';
 import HalamanAdmin from '../halaman/HalamanAdmin.vue';
@@ -12,9 +14,21 @@ import { useAuthStore } from '../penyimpanan/authStore';
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    name: 'Tamu',
-    component: HalamanTamu,
+    name: 'Beranda',
+    component: HalamanUtama,
     meta: { judul: 'Beranda - Denanta TranSolution' }
+  },
+  {
+    path: '/tentang',
+    name: 'Tentang',
+    component: HalamanTentang,
+    meta: { judul: 'Tentang Kami - Denanta TranSolution' }
+  },
+  {
+    path: '/berlangganan',
+    name: 'Berlangganan',
+    component: HalamanBerlangganan,
+    meta: { judul: 'Berlangganan - Denanta TranSolution' }
   },
   {
     path: '/login',
