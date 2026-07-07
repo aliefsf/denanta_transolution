@@ -1,156 +1,230 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { User, MapPin, Navigation, DollarSign, Bell } from 'lucide-vue-next';
+import { useAuthStore } from '../../penyimpanan/authStore';
+import { formatMataUang } from '../../bantuan/formatMataUang';
+import { 
+  Users, Calendar, CreditCard, Clock, 
+  ChevronRight, Phone 
+} from 'lucide-vue-next';
 import KartuUtama from '../umum/KartuUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
+import BadgeStatusAnak from './BadgeStatusAnak.vue';
 
-const anakList = ref([
-  { id: 1, nama: 'Rafi Alief', status: 'Dalam Perjalanan', supir: 'Pak Budi', armada: 'Avanza B 1234 DTS' },
-  { id: 2, nama: 'Aisyah Putri', status: 'Tiba di Sekolah', supir: 'Pak Budi', armada: 'Avanza B 1234 DTS' }
+const authStore = useAuthStore();
+
+const emit = defineEmits<{
+  (e: 'buka-detail', anak: any): void;
+  (e: 'ubah-tab', tab: string): void;
+}>();
+
+// Mock Data Anak Terdaftar
+const daftarAnak = ref([
+  {
+    id: 'anak-1',
+    nama: 'Aisyah Putri',
+    sekolah: 'SD N 01 Padang',
+    kelas: 'Kelas 4-A',
+    layanan: 'Antar Jemput (PP)',
+    status: 'berangkat', // berangkat, sekolah, pulang, rumah, absen
+    namaSupir: 'Pak Budi',
+    kontakSupir: '+628123456789',
+    alamatJemput: 'Jln. Prof. M. Yamin No. 12, Padang',
+    foto: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&h=120&fit=crop&crop=faces'
+  }
 ]);
 
-const riwayatTagihan = ref([
-  { bulan: 'Juli 2026', total: 450000, status: 'Lunas' },
-  { bulan: 'Juni 2026', total: 450000, status: 'Lunas' }
+// Mock Notifikasi Terbaru
+const notifikasi = ref([
+  { id: 'notif-1', kategori: 'perjalanan', pesan: 'Aisyah Putri telah naik ke bus sekolah bersama Supir Budi.', waktu: '15 menit yang lalu' },
+  { id: 'notif-2', kategori: 'pembayaran', pesan: 'Pembayaran langganan bulan Juli jatuh tempo pada tanggal 7.', waktu: '1 jam yang lalu' },
+  { id: 'notif-3', kategori: 'sistem', pesan: 'Armada Bus B-102 selesai melewati servis bulanan rutin.', waktu: '1 hari yang lalu' }
 ]);
+
+const sisaHariLangganan = ref(25);
+const totalTagihan = ref(475000);
+
+const lihatLokasiLangsung = (anak: any) => {
+  emit('buka-detail', anak);
+};
 </script>
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
+    <!-- Welcome Greeting Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-bold text-white tracking-wide">Dashboard Orang Tua</h2>
-        <p class="text-slate-400 text-xs mt-0.5">Pantau keselamatan dan pembayaran antar-jemput anak Anda.</p>
+        <h1 class="text-2xl font-extrabold text-white tracking-tight">Halo, {{ authStore.pengguna?.email?.split('@')[0] || 'Orang Tua' }}!</h1>
+        <p class="text-xs text-slate-400">Selamat datang kembali di panel monitoring Denanta TranSolution.</p>
       </div>
-      <TombolUtama varian="aksen" ukuran="kecil" class="gap-1">
-        <Bell class="w-4 h-4" />
-        Notifikasi
-      </TombolUtama>
+      <div 
+        v-if="sisaHariLangganan <= 5"
+        class="bg-rose-950/20 border border-rose-500/30 text-rose-300 text-xs px-4 py-2.5 rounded-xl flex items-center gap-2"
+      >
+        <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+        <span>Langganan Anda segera berakhir dalam <strong>{{ sisaHariLangganan }} hari</strong>.</span>
+      </div>
     </div>
 
-    <!-- Main Grid -->
+    <!-- Summary Widgets Grid -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 1. Status Anak -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-4 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Status Anak</span>
+          <Clock class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-lg font-bold text-white leading-tight">
+          {{ daftarAnak[0].status === 'berangkat' ? 'Perjalanan Pergi' : 'Di Sekolah' }}
+        </p>
+        <div class="pt-1">
+          <BadgeStatusAnak :status="daftarAnak[0].status" />
+        </div>
+      </div>
+
+      <!-- 2. Sisa Hari -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-4 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Sisa Langganan</span>
+          <Calendar class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-3xl font-black text-white tracking-wide">
+          {{ sisaHariLangganan }}
+          <span class="text-xs font-normal text-slate-400">hari lagi</span>
+        </p>
+        <p class="text-[10px] text-slate-500">Masa aktif s.d. akhir bulan berjalan</p>
+      </div>
+
+      <!-- 3. Tagihan -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-4 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Tagihan Bulan Ini</span>
+          <CreditCard class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-2xl font-black text-white tracking-wide">
+          {{ formatMataUang(totalTagihan) }}
+        </p>
+        <p class="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">LUNAS - Pembayaran Terverifikasi</p>
+      </div>
+
+      <!-- 4. Anak Terdaftar -->
+      <div class="bg-warnaSekunder border border-warnaAksen/30 rounded-2xl p-4 space-y-2 shadow">
+        <div class="flex justify-between items-center text-slate-400 text-xs font-semibold">
+          <span>Anak Terdaftar</span>
+          <Users class="w-4 h-4 text-warnaTombol" />
+        </div>
+        <p class="text-3xl font-black text-white tracking-wide">
+          {{ daftarAnak.length }}
+          <span class="text-xs font-normal text-slate-400">anak</span>
+        </p>
+        <p class="text-[10px] text-slate-500">Terdaftar di SD N 01 Padang</p>
+      </div>
+    </div>
+
+    <!-- Main Content Area Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- Left: Children & Map -->
+      
+      <!-- Left: Children Status Cards & Shortcut -->
       <div class="lg:col-span-2 space-y-6">
-        <!-- Status Anak -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <KartuUtama
-            v-for="anak in anakList"
-            :key="anak.id"
-            :judul="anak.nama"
-            :subjudul="`Armada: ${anak.armada}`"
-          >
-            <div class="space-y-3">
-              <div class="flex items-center justify-between text-sm">
-                <span class="text-slate-400">Status Perjalanan:</span>
-                <span
-                  class="px-2 py-0.5 rounded text-xs font-semibold"
-                  :class="anak.status === 'Dalam Perjalanan' ? 'bg-amber-600/30 text-amber-400 border border-amber-500/30' : 'bg-emerald-600/30 text-emerald-400 border border-emerald-500/30'"
-                >
-                  {{ anak.status }}
-                </span>
-              </div>
-              <div class="flex items-center gap-2 text-sm text-slate-300">
-                <User class="w-4 h-4 text-warnaTombol" />
-                <span>Supir: <strong class="text-white">{{ anak.supir }}</strong></span>
-              </div>
-            </div>
-            <template #footer>
-              <div class="flex justify-end gap-2">
-                <TombolUtama varian="garis-luar" ukuran="kecil" class="gap-1">
-                  <MapPin class="w-3.5 h-3.5" />
-                  Hubungi Supir
-                </TombolUtama>
-              </div>
-            </template>
-          </KartuUtama>
+        <!-- Live Action Shortcut -->
+        <div 
+          v-if="daftarAnak[0].status === 'berangkat' || daftarAnak[0].status === 'pulang'"
+          class="bg-gradient-to-r from-warnaAksen/40 to-warnaSekunder border border-warnaAksen/30 p-5 rounded-2xl flex items-center justify-between shadow"
+        >
+          <div class="space-y-1">
+            <span class="w-fit inline-flex items-center gap-1 bg-warnaTombol/10 text-warnaTombol border border-warnaTombol/30 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+              Dalam Perjalanan
+            </span>
+            <h3 class="text-sm font-bold text-white">Lacak Posisi Anak Anda Secara Real-time</h3>
+            <p class="text-xs text-slate-400">Siswa Aisyah Putri sedang dalam perjalanan bersama driver Budi.</p>
+          </div>
+          <TombolUtama varian="utama" class="gap-1 text-xs" @click="lihatLokasiLangsung(daftarAnak[0])">
+            Lacak Posisi
+            <ChevronRight class="w-4 h-4" />
+          </TombolUtama>
         </div>
 
-        <!-- Live Map Preview Mock -->
-        <KartuUtama judul="Peta Pelacakan Live (Simulasi)" subjudul="Rute perjalanan armada Avanza B 1234 DTS">
-          <div class="w-full h-80 bg-warnaUtama border border-warnaAksen/30 rounded-lg flex flex-col items-center justify-center relative overflow-hidden">
-            <!-- Grid lines to make it look like a map -->
-            <div class="absolute inset-0 bg-[linear-gradient(to_right,#0f3460_1px,transparent_1px),linear-gradient(to_bottom,#0f3460_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-20"></div>
-            
-            <div class="z-10 text-center space-y-3 p-4">
-              <div class="animate-bounce inline-flex items-center justify-center p-3 bg-warnaTombol rounded-full shadow-lg shadow-warnaTombol/40">
-                <Navigation class="w-6 h-6 text-white rotate-45" />
-              </div>
-              <p class="text-white text-sm font-semibold">Simulasi Posisi Armada</p>
-              <p class="text-slate-400 text-xs max-w-sm">Peta Leaflet interaktif akan diinisialisasi menggunakan data kordinat riil dari Supir.</p>
-            </div>
-            <div class="absolute bottom-4 left-4 right-4 bg-warnaSekunder/90 border border-warnaAksen/40 p-3 rounded-lg flex items-center justify-between text-xs">
-              <div>
-                <p class="text-white font-bold">Posisi Saat Ini:</p>
-                <p class="text-slate-300">Jalan Raya Margonda, Depok (Speed: 45 km/h)</p>
-              </div>
-              <span class="text-warnaTombol font-extrabold animate-pulse">● LIVE</span>
-            </div>
-          </div>
-        </KartuUtama>
-      </div>
-
-      <!-- Right: Payments & Billing -->
-      <div class="space-y-6">
-        <KartuUtama judul="Manajemen Pembayaran" subjudul="Integrasi Midtrans untuk tagihan sekolah harian">
-          <div class="space-y-6">
-            <div class="p-4 bg-warnaUtama/50 border border-warnaAksen/20 rounded-lg text-center space-y-2">
-              <p class="text-slate-400 text-xs">Tagihan Bulan Ini (Juli 2026)</p>
-              <p class="text-3xl font-extrabold text-white">Rp 450.000</p>
-              <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Sudah Dilunasi
-              </span>
-            </div>
-
-            <div class="space-y-3">
-              <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Riwayat Transaksi</h4>
-              <div
-                v-for="tagihan in riwayatTagihan"
-                :key="tagihan.bulan"
-                class="flex items-center justify-between text-sm py-2 border-b border-warnaAksen/20"
-              >
-                <div class="flex items-center gap-2">
-                  <DollarSign class="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <p class="text-white font-medium">{{ tagihan.bulan }}</p>
-                    <p class="text-slate-400 text-xs">Rp {{ tagihan.total.toLocaleString('id-ID') }}</p>
-                  </div>
+        <!-- Status Detail Anak Sekolah -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider">Status Anak Terdaftar</h3>
+          
+          <div 
+            v-for="anak in daftarAnak" 
+            :key="anak.id"
+            class="bg-warnaSekunder border border-warnaAksen/30 p-5 rounded-2xl space-y-4 shadow"
+          >
+            <div class="flex items-center gap-4">
+              <img :src="anak.foto" :alt="anak.nama" class="w-12 h-12 rounded-xl object-cover border border-warnaAksen/30" />
+              <div class="flex-grow">
+                <div class="flex flex-wrap items-center gap-2">
+                  <h4 class="text-base font-bold text-white">{{ anak.nama }}</h4>
+                  <BadgeStatusAnak :status="anak.status" />
                 </div>
-                <span class="text-emerald-400 text-xs font-semibold">{{ tagihan.status }}</span>
+                <p class="text-xs text-slate-400 mt-0.5">{{ anak.sekolah }} | {{ anak.kelas }}</p>
               </div>
             </div>
 
-            <TombolUtama varian="utama" class="w-full">
-              Bayar Tagihan Baru
-            </TombolUtama>
+            <!-- Driver Info and Map Shortcut -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-warnaAksen/20 text-xs">
+              <div class="space-y-1.5 text-slate-300">
+                <p class="text-slate-400">Driver Pendamping:</p>
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-white">{{ anak.namaSupir }}</span>
+                  <a :href="'tel:' + anak.kontakSupir" class="text-warnaTombol hover:underline flex items-center gap-0.5">
+                    <Phone class="w-3.5 h-3.5" /> Hubungi
+                  </a>
+                </div>
+              </div>
+
+              <div class="flex items-center md:justify-end gap-2">
+                <TombolUtama varian="garis-luar" class="text-xs py-2 w-full md:w-auto" @click="emit('ubah-tab', 'jadwal')">
+                  Absen Harian
+                </TombolUtama>
+                <TombolUtama varian="utama" class="text-xs py-2 w-full md:w-auto" @click="emit('buka-detail', anak)">
+                  Detail Pelacakan
+                </TombolUtama>
+              </div>
+            </div>
           </div>
-        </KartuUtama>
+        </div>
+      </div>
 
-        <KartuUtama judul="Informasi Kontak Supir">
+      <!-- Right: Recent Alerts & Notifications -->
+      <div class="space-y-6">
+        <KartuUtama judul="Pemberitahuan Terbaru" subjudul="Aktivitas perjalanan dan administrasi terpadu">
           <div class="space-y-4">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-warnaAksen flex items-center justify-center text-white font-extrabold">
-                B
+            <div 
+              v-for="notif in notifikasi" 
+              :key="notif.id"
+              class="border-b border-warnaAksen/10 pb-3 last:border-b-0 space-y-1"
+            >
+              <div class="flex justify-between items-center text-[10px]">
+                <span 
+                  class="font-bold uppercase tracking-wider"
+                  :class="{
+                    'text-warnaTombol': notif.kategori === 'perjalanan',
+                    'text-amber-400': notif.kategori === 'pembayaran',
+                    'text-blue-400': notif.kategori === 'sistem'
+                  }"
+                >
+                  {{ notif.kategori }}
+                </span>
+                <span class="text-slate-500 font-mono">{{ notif.waktu }}</span>
               </div>
-              <div>
-                <p class="text-white font-bold text-sm">Pak Budi Santoso</p>
-                <p class="text-slate-400 text-xs">Rute Depok - Jakarta Selatan</p>
-              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">{{ notif.pesan }}</p>
             </div>
-            <p class="text-slate-400 text-xs leading-relaxed">
-              Silakan hubungi supir secara berkala jika ada keterlambatan penjemputan anak secara mendadak.
-            </p>
-            <div class="grid grid-cols-2 gap-2">
-              <TombolUtama varian="garis-luar" ukuran="kecil">
-                WhatsApp
-              </TombolUtama>
-              <TombolUtama varian="garis-luar" ukuran="kecil">
-                Telepon
-              </TombolUtama>
+            
+            <div class="pt-2 text-center">
+              <button 
+                @click="emit('ubah-tab', 'notifikasi')"
+                class="text-xs font-bold text-warnaTombol hover:underline"
+              >
+                Lihat Seluruh Notifikasi
+              </button>
             </div>
           </div>
         </KartuUtama>
       </div>
+
     </div>
   </div>
 </template>
