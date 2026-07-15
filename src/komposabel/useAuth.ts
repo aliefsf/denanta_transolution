@@ -36,6 +36,62 @@ export function useAuth() {
         }
       });
       if (errSignUp) throw errSignUp;
+
+      // Membuat profil pada public.pengguna dan tabel spesifik peran jika user berhasil terdaftar
+      if (data?.user) {
+        // Cek duplikasi untuk menghindari error duplicate key
+        const { data: profilSama } = await client
+          .from('pengguna')
+          .select('id')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (!profilSama) {
+          const { error: errInsert } = await client
+            .from('pengguna')
+            .insert({
+              id: data.user.id,
+              email: email,
+              peran: peran,
+              nama_lengkap: namaLengkap,
+              nomor_telepon: nomorTelepon
+            });
+
+          if (errInsert) {
+            throw new Error(`Gagal menyimpan profil pengguna ke database: ${errInsert.message}`);
+          }
+
+          // Buat baris awal di tabel peran spesifik (orang_tua atau supir)
+          if (peran === 'orangtua') {
+            const { error: errOrangTua } = await client
+              .from('orang_tua')
+              .insert({
+                id: data.user.id,
+                alamat: '',
+                kontak_darurat: '',
+                nomor_whatsapp: nomorTelepon
+              });
+            if (errOrangTua) {
+              throw new Error(`Gagal menyimpan profil orang tua ke database: ${errOrangTua.message}`);
+            }
+          } else if (peran === 'supir') {
+            const { error: errSupir } = await client
+              .from('supir')
+              .insert({
+                id: data.user.id,
+                jenis_kendaraan: '',
+                nomor_plat: '',
+                tipe_supir: 'tetap',
+                aktif: false,
+                status_verifikasi: 'menunggu'
+              });
+            if (errSupir) {
+              throw new Error(`Gagal menyimpan profil supir ke database: ${errSupir.message}`);
+            }
+          }
+        }
+      }
+
       return data;
     } catch (err: any) {
       error.value = err.message || 'Terjadi kesalahan saat mendaftar';
@@ -124,13 +180,66 @@ export function useAuth() {
   async function ambilPeran(uid: string): Promise<string> {
     if (!supabase) return 'tamu';
     try {
-      const { data, error: errPeran } = await supabase
+      const client = harusAdaSupabase();
+      const { data, error: errPeran } = await client
         .from('pengguna')
         .select('peran')
         .eq('id', uid)
         .single();
-      if (errPeran || !data) return 'tamu';
-      return data.peran;
+      
+      if (!errPeran && data) return data.peran;
+
+      // Skenario Pemulihan: Jika profil tidak ditemukan, sinkronisasikan ulang dari Supabase Auth metadata
+      const { data: { user } } = await client.auth.getUser();
+      if (user && user.id === uid) {
+        const metadata = user.user_metadata || {};
+        const email = user.email || '';
+        const peran = (metadata.peran as string) || 'orangtua';
+        const namaLengkap = (metadata.nama_lengkap as string) || 'Pengguna Baru';
+        const nomorTelepon = (metadata.nomor_telepon as string) || '';
+
+        // Cek kembali duplikasi profil
+        const { data: cekProfil } = await client
+          .from('pengguna')
+          .select('id')
+          .eq('id', uid)
+          .maybeSingle();
+
+        if (!cekProfil) {
+          const { error: errInsert } = await client
+            .from('pengguna')
+            .insert({
+              id: uid,
+              email: email,
+              peran: peran,
+              nama_lengkap: namaLengkap,
+              nomor_telepon: nomorTelepon
+            });
+
+          if (!errInsert) {
+            if (peran === 'orangtua') {
+              await client.from('orang_tua').insert({
+                id: uid,
+                alamat: '',
+                kontak_darurat: '',
+                nomor_whatsapp: nomorTelepon
+              });
+            } else if (peran === 'supir') {
+              await client.from('supir').insert({
+                id: uid,
+                jenis_kendaraan: '',
+                nomor_plat: '',
+                tipe_supir: 'tetap',
+                aktif: false,
+                status_verifikasi: 'menunggu'
+              });
+            }
+            return peran;
+          }
+        }
+      }
+
+      return 'tamu';
     } catch {
       return 'tamu';
     }

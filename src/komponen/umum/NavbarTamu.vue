@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../penyimpanan/authStore';
-import { Bus, LogIn, Menu, X, LayoutDashboard, Bell } from 'lucide-vue-next';
+import { Bus, LogIn, Menu, X, Bell, User } from 'lucide-vue-next';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -18,12 +18,12 @@ const navigasiKe = (path: string) => {
   menuTerbuka.value = false;
 };
 
-const getDashboardPath = () => {
-  if (authStore.apakahAdmin) return '/admin';
-  if (authStore.apakahSupir) return '/supir';
-  if (authStore.apakahOrangTua) return '/orangtua';
-  return '/';
-};
+const profilePath = computed(() => {
+  if (authStore.apakahAdmin) return { path: '/admin', query: { tab: 'profil' } };
+  if (authStore.apakahSupir) return { path: '/supir', query: { tab: 'profil' } };
+  if (authStore.apakahOrangTua) return { path: '/orangtua', query: { tab: 'profil' } };
+  return { path: '/' };
+});
 </script>
 
 <template>
@@ -42,7 +42,22 @@ const getDashboardPath = () => {
         <div class="hidden md:flex items-center space-x-6">
           <router-link to="/" class="text-slate-300 hover:text-white text-sm font-medium transition-colors" active-class="text-warnaTombol font-semibold">Beranda</router-link>
           <router-link to="/tentang" class="text-slate-300 hover:text-white text-sm font-medium transition-colors" active-class="text-warnaTombol font-semibold">Tentang</router-link>
-          <router-link to="/berlangganan" class="text-slate-300 hover:text-white text-sm font-medium transition-colors" active-class="text-warnaTombol font-semibold">Berlangganan</router-link>
+          <router-link 
+            v-if="authStore.sudahLogin && authStore.sudahBerlangganan" 
+            :to="{ path: '/orangtua', query: { tab: 'pantau' } }" 
+            class="text-slate-300 hover:text-white text-sm font-medium transition-colors" 
+            active-class="text-warnaTombol font-semibold"
+          >
+            Monitoring
+          </router-link>
+          <router-link 
+            v-else 
+            to="/berlangganan" 
+            class="text-slate-300 hover:text-white text-sm font-medium transition-colors" 
+            active-class="text-warnaTombol font-semibold"
+          >
+            Berlangganan
+          </router-link>
           
           <!-- Notifikasi Icon -->
           <div v-if="authStore.sudahLogin" class="relative cursor-pointer text-slate-400 hover:text-white transition-colors">
@@ -52,11 +67,11 @@ const getDashboardPath = () => {
 
           <div v-if="authStore.sudahLogin" class="flex items-center space-x-4">
             <router-link
-              :to="getDashboardPath()"
-              class="bg-warnaAksen hover:bg-opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5"
+              :to="profilePath"
+              class="p-2 rounded-lg bg-warnaAksen hover:bg-opacity-90 border border-warnaAksen text-slate-300 hover:text-white transition-colors flex items-center justify-center cursor-pointer"
+              title="Edit Profil"
             >
-              <LayoutDashboard class="w-4 h-4" />
-              Dashboard
+              <User class="w-5 h-5 text-warnaTombol" />
             </router-link>
           </div>
           <div v-else class="flex items-center space-x-4">
@@ -87,16 +102,31 @@ const getDashboardPath = () => {
     <div v-show="menuTerbuka" class="md:hidden bg-warnaSekunder border-b border-warnaAksen/30 py-3 px-4 space-y-3">
       <router-link to="/" @click="menuTerbuka = false" class="block text-slate-300 hover:text-white text-base font-medium">Beranda</router-link>
       <router-link to="/tentang" @click="menuTerbuka = false" class="block text-slate-300 hover:text-white text-base font-medium">Tentang</router-link>
-      <router-link to="/berlangganan" @click="menuTerbuka = false" class="block text-slate-300 hover:text-white text-base font-medium">Berlangganan</router-link>
+      <router-link 
+        v-if="authStore.sudahLogin && authStore.sudahBerlangganan" 
+        :to="{ path: '/orangtua', query: { tab: 'pantau' } }" 
+        @click="menuTerbuka = false" 
+        class="block text-slate-300 hover:text-white text-base font-medium"
+      >
+        Monitoring
+      </router-link>
+      <router-link 
+        v-else 
+        to="/berlangganan" 
+        @click="menuTerbuka = false" 
+        class="block text-slate-300 hover:text-white text-base font-medium"
+      >
+        Berlangganan
+      </router-link>
       
       <div v-if="authStore.sudahLogin" class="pt-2 border-t border-warnaAksen/20">
         <router-link
-          :to="getDashboardPath()"
+          :to="profilePath"
           @click="menuTerbuka = false"
           class="w-full bg-warnaAksen hover:bg-opacity-90 text-white py-2 rounded-lg text-center font-semibold flex items-center justify-center gap-2"
         >
-          <LayoutDashboard class="w-4 h-4" />
-          Dashboard
+          <User class="w-4 h-4 text-warnaTombol" />
+          Edit Profil
         </router-link>
       </div>
       <div v-else class="pt-2 border-t border-warnaAksen/20 space-y-2">

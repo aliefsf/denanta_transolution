@@ -15,7 +15,7 @@ import {
 const authStore = useAuthStore();
 
 // Wizard Step Tracker (0 to 3)
-const langkahAktif = ref(0);
+const langkahAktif = ref(authStore.sudahLogin ? 1 : 0);
 
 // Notifikasi Toast
 const toastTampil = ref(false);
@@ -41,9 +41,9 @@ const otpTerkirim = ref(false);
 const otpTerverifikasi = ref(false);
 
 // Langkah 1: Profil Orang Tua
-const namaOrangTua = ref('');
-const emailOrangTua = ref('');
-const waOrangTua = ref('');
+const namaOrangTua = ref(authStore.pengguna?.user_metadata?.nama_lengkap || authStore.pengguna?.nama_lengkap || '');
+const emailOrangTua = ref(authStore.pengguna?.email || '');
+const waOrangTua = ref(authStore.pengguna?.user_metadata?.nomor_telepon || authStore.pengguna?.nomor_telepon || '');
 const alamatDomisili = ref('');
 const kontakDarurat = ref('');
 
@@ -198,6 +198,7 @@ const bayarSnapMidtrans = () => {
 const selesaikanPembayaranMock = () => {
   snapTampil.value = false;
   pembayaranLunas.value = true;
+  authStore.setSudahBerlangganan(true);
   picuToast('Pembayaran berhasil dilunasi via Midtrans Snap!', 'sukses');
 };
 
@@ -656,9 +657,9 @@ const totalTagihan = computed(() => {
 
               <!-- Button redirect to parents dashboard -->
               <div class="flex justify-center">
-                <router-link to="/orangtua">
+                <router-link :to="{ path: '/orangtua', query: { tab: 'pantau' } }">
                   <TombolUtama varian="utama" class="gap-2">
-                    Masuk ke Dashboard Orang Tua
+                    Masuk ke Halaman Monitoring Anak
                     <ArrowRight class="w-5 h-5" />
                   </TombolUtama>
                 </router-link>

@@ -293,6 +293,60 @@ CREATE TRIGGER trg_perbarui_perjalanan BEFORE UPDATE ON perjalanan FOR EACH ROW 
 CREATE TRIGGER trg_perbarui_pembayaran BEFORE UPDATE ON pembayaran FOR EACH ROW EXECUTE FUNCTION fungsi_perbarui_waktu();
 CREATE TRIGGER trg_perbarui_penundaan BEFORE UPDATE ON penundaan_pembayaran FOR EACH ROW EXECUTE FUNCTION fungsi_perbarui_waktu();
 
+-- Trigger Baru: Sinkronisasi Pengguna Otomatis dari auth.users ke public.pengguna dan tabel peran spesifik
+CREATE OR REPLACE FUNCTION fungsi_sinkronisasi_pengguna_baru()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_peran text;
+  v_nama_lengkap text;
+  v_nomor_telepon text;
+BEGIN
+  -- Ambil data dari metadata dengan nilai default yang aman
+  v_peran := COALESCE(NEW.raw_user_meta_data->>'peran', 'orangtua');
+  v_nama_lengkap := COALESCE(NEW.raw_user_meta_data->>'nama_lengkap', 'Pengguna Baru');
+  v_nomor_telepon := COALESCE(NEW.raw_user_meta_data->>'nomor_telepon', '');
+
+  -- Validasi peran agar sesuai dengan batasan check constraint
+  IF v_peran NOT IN ('orangtua', 'supir', 'admin', 'tamu') THEN
+    v_peran := 'orangtua';
+  END IF;
+
+  -- Masukkan ke tabel pengguna
+  INSERT INTO public.pengguna (id, email, peran, nama_lengkap, nomor_telepon)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    v_peran,
+    v_nama_lengkap,
+    v_nomor_telepon
+  );
+
+  -- Masukkan ke tabel peran spesifik
+  IF v_peran = 'orangtua' THEN
+    INSERT INTO public.orang_tua (id, alamat, kontak_darurat, nomor_whatsapp)
+    VALUES (NEW.id, '', '', v_nomor_telepon);
+  ELSIF v_peran = 'supir' THEN
+    INSERT INTO public.supir (id, jenis_kendaraan, nomor_plat, tipe_supir, aktif, status_verifikasi)
+    VALUES (NEW.id, '', '', 'tetap', false, 'menunggu');
+  END IF;
+
+  RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Menghindari kegagalan registrasi jika trigger bermasalah
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Hapus trigger jika sudah ada sebelumnya
+DROP TRIGGER IF EXISTS trg_pengguna_baru ON auth.users;
+
+-- Ikat trigger sinkronisasi pengguna baru ke auth.users
+CREATE TRIGGER trg_pengguna_baru
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION fungsi_sinkronisasi_pengguna_baru();
+
 -- Trigger B: Pembuatan Langganan Otomatis saat Siswa/Anak baru ditambahkan
 CREATE OR REPLACE FUNCTION fungsi_buat_langganan_otomatis()
 RETURNS TRIGGER AS $$

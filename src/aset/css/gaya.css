@@ -26,3 +26,26 @@ html, body {
 ::-webkit-scrollbar-thumb:hover {
   background: #e94560; /* warnaTombol */
 }
+
+/* Utilitas kustom untuk landing page */
+.soft-shadow {
+  box-shadow: 0px 4px 20px rgba(20, 163, 139, 0.08);
+}
+.modal-shadow {
+  box-shadow: 0px 8px 30px rgba(0, 0, 0, 0.12);
+}
+.dashed-connector {
+  background-image: linear-gradient(to right, #006b5a 40%, rgba(255,255,255,0) 0%);
+  background-position: bottom;
+  background-size: 10px 1px;
+  background-repeat: repeat-x;
+}
+
+/* Pola latar belakang titik-titik tosca */
+.bg-pattern {
+  background-color: #F5FBFA;
+  background-image: radial-gradient(#62dac0 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: -10px -10px;
+}
+

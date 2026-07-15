@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import TataLetakSupir from './tataletak/TataLetakSupir.vue';
 import DashboardSupir from '../komponen/supir/DashboardSupir.vue';
 import TugasSupir from '../komponen/supir/TugasSupir.vue';
@@ -7,9 +8,22 @@ import RiwayatSupir from '../komponen/supir/RiwayatSupir.vue';
 import ProfilSupir from '../komponen/supir/ProfilSupir.vue';
 import NotifikasiUtama from '../komponen/umum/NotifikasiUtama.vue';
 
+const route = useRoute();
+
 // Tab Aktif: dashboard, tugas, riwayat, profil
 const tabAktif = ref<'dashboard' | 'tugas' | 'riwayat' | 'profil' | string>('dashboard');
 const siapKerja = ref(true);
+
+// Sinkronkan tabAktif dengan route.query.tab secara reaktif melalui pemantauan fullPath
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.query.tab && typeof route.query.tab === 'string') {
+      tabAktif.value = route.query.tab;
+    }
+  },
+  { immediate: true }
+);
 
 // Toast Alert
 const toastTampil = ref(false);

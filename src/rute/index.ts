@@ -34,13 +34,13 @@ const routes: Array<RouteRecordRaw> = [
     path: '/login',
     name: 'Login',
     component: Login,
-    meta: { judul: 'Masuk - Denanta TranSolution', hanyaTamu: true }
+    meta: { judul: 'Masuk - Denanta TranSolution' }
   },
   {
     path: '/daftar',
     name: 'Daftar',
     component: Daftar,
-    meta: { judul: 'Daftar Akun - Denanta TranSolution', hanyaTamu: true }
+    meta: { judul: 'Daftar Akun - Denanta TranSolution' }
   },
   {
     path: '/lupa-kata-sandi',
@@ -95,6 +95,16 @@ router.beforeEach(async (to, _from, next) => {
 
   const judulDefault = 'Denanta TranSolution';
   document.title = (to.meta.judul as string) || judulDefault;
+
+  // Jika pengguna sudah berlangganan dan mencoba mengakses halaman /berlangganan, arahkan ke dashboard orangtua
+  if (to.path === '/berlangganan' && authStore.sudahLogin && authStore.sudahBerlangganan) {
+    return next('/orangtua');
+  }
+
+  // Jika pengguna belum login (belum daftar) dan mencoba mengakses halaman /berlangganan, arahkan ke halaman pendaftaran (/daftar)
+  if (to.path === '/berlangganan' && !authStore.sudahLogin) {
+    return next('/daftar');
+  }
 
   // Jika halaman bertanda khusus Tamu tapi user sudah login, arahkan ke dashboard masing-masing
   if (to.meta.hanyaTamu && authStore.sudahLogin) {
