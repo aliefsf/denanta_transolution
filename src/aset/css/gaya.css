@@ -20,6 +20,13 @@ html, body {
   background-color: #f5fbf7; /* samakan dengan token Tailwind `background` */
   color: #171d1b; /* samakan dengan token Tailwind `on-background` */
   font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  /* Sidebar mobile (HalamanUtama.vue) menggeser kontennya sendiri lewat
+     transform:translateX negatif -- overflow-x-hidden pada elemen itu saja
+     TIDAK mencegah body ikut melebar/muncul scrollbar horizontal, karena
+     overflow suatu elemen cuma memotong ANAK-nya, bukan memotong dirinya
+     sendiri relatif ke body. Dikunci di sini (level body) supaya pergeseran
+     itu tidak pernah memunculkan scroll horizontal singkat/gap kosong. */
+  overflow-x: hidden;
 }
 
 /* Custom scrollbar */

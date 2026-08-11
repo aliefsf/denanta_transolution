@@ -7,6 +7,7 @@ import { ambilTanggalWibSekarang } from '../../bantuan/waktuSimulasi';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 import { useAuth } from '../../komposabel/useAuth';
 import { gunakanRealtimeSubscription } from '../../layanan/realtimeLayanan';
+import { useResetHariBerganti } from '../../komposabel/useResetHariBerganti';
 
 const { currentUser } = useAuth();
 
@@ -65,6 +66,13 @@ onMounted(() => {
 onUnmounted(() => {
   saluranTugas?.unsubscribe();
   saluranTugas = null;
+});
+
+// Reset otomatis tepat pukul 00:00 WIB -- lihat catatan lengkap di
+// TugasSupir.vue/useResetHariBerganti.ts.
+useResetHariBerganti(() => {
+  daftarTugas.value = [];
+  muatTugasHariIni();
 });
 
 // Supir yang belum mengisi absensi (atau menandai "Tidak Bertugas") tidak

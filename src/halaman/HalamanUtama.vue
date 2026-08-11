@@ -186,8 +186,18 @@ const namaPengguna = computed(() => {
 </script>
 
 <template>
-  <div class="bg-background text-on-background font-body-md relative overflow-x-hidden min-h-screen pt-24">
-    
+  <!-- Sidebar mobile "mendorong" konten (bukan overlay) -- transform di sini
+       WAJIB "none" (bukan "translateX(0)") saat tertutup, supaya elemen
+       fixed di dalamnya (nav) tetap benar-benar fixed ke viewport asli
+       seperti sebelumnya; "translateX(0)" pun sebenarnya sudah cukup untuk
+       menjadikan div ini containing-block bagi descendant fixed (aturan
+       CSS: transform apa pun selain none memicu itu), makanya dibedakan
+       eksplisit di sini, bukan cuma angka geser 0 vs -18rem. -->
+  <div
+    class="bg-background text-on-background font-body-md relative overflow-x-hidden min-h-screen pt-24 transition-transform duration-300"
+    :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }"
+  >
+
     <!-- TopNavBar -->
     <nav class="bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant/30 shadow-sm fixed top-0 left-0 w-full z-50">
       <div class="flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-[1280px] mx-auto">
@@ -272,72 +282,73 @@ const namaPengguna = computed(() => {
       </div>
     </nav>
 
-    <!-- Mobile Sidebar Backdrop -->
-    <div
-      v-if="menuTerbuka"
-      @click="toggleMenu"
-      class="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-    ></div>
-
-    <!-- Mobile Sidebar Drawer -->
-    <aside
-      class="md:hidden fixed top-0 bottom-0 right-0 w-72 max-w-[80vw] bg-surface-container-lowest z-50 border-l border-outline-variant/30 flex flex-col transition-transform duration-300 shadow-xl"
-      :class="menuTerbuka ? 'translate-x-0' : 'translate-x-full'"
-    >
-      <div class="h-20 flex items-center justify-between px-margin-mobile border-b border-outline-variant/30 flex-shrink-0">
-        <img src="/logo-denanta.png" alt="Denanta TranSolution" class="h-12 w-auto" />
-        <button @click="toggleMenu" class="text-on-surface-variant hover:text-on-surface p-1 cursor-pointer border-0 bg-transparent">
-          <X class="w-6 h-6" />
-        </button>
-      </div>
-
-      <nav class="flex-grow overflow-y-auto tanpa-scrollbar px-margin-mobile py-6 flex flex-col gap-3">
-        <a @click="navigasiKe('/'); menuTerbuka = false" :class="kelasMenuBerandaMobile">Beranda</a>
-        <router-link to="/tentang" @click="menuTerbuka = false" :class="kelasMenuTentangMobile">Tentang Kami</router-link>
-        <button
-          type="button"
-          @click="bukaMenuLangganan"
-          :class="[kelasMenuLangganganMobile, 'w-full text-left border-0', route.path === '/berlangganan' ? '' : 'bg-transparent']"
-        >
-          {{ labelMenuLangganan }}
-        </button>
-      </nav>
-
-      <div class="px-margin-mobile py-6 border-t border-outline-variant/20 flex flex-col gap-2 flex-shrink-0">
-        <div v-if="isAuthenticated" class="flex flex-col gap-2">
-          <router-link
-            to="/profile/edit"
-            @click="menuTerbuka = false"
-            class="w-full bg-brand-tosca-light hover:bg-[#D5F0EB] text-primary py-2.5 rounded-xl text-center font-semibold flex items-center justify-center gap-2"
-          >
-            <User class="w-4 h-4" />
-            Edit Profil
-          </router-link>
-          <button
-            @click="navigasiDashboard"
-            class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0"
-          >
-            Dashboard
+    <!-- Sidebar mobile -- di-Teleport ke <body> supaya BENAR-BENAR fixed ke
+         viewport asli (bukan ancestor yang sekarang punya transform di
+         atas), bukan overlay penuh layar: begitu dibuka, konten halaman
+         (div pembungkus di atas) bergeser ke kiri sejauh lebar sidebar ini
+         (18rem, sama persis dengan w-72 di bawah -- max-w-[80vw] SENGAJA
+         dihapus supaya lebar sidebar selalu pas dengan jarak geser, tidak
+         menyisakan celah di layar sangat sempit). -->
+    <Teleport to="body">
+      <aside
+        class="md:hidden fixed top-0 bottom-0 right-0 w-72 bg-surface-container-lowest z-50 border-l border-outline-variant/30 flex flex-col transition-transform duration-300 shadow-xl"
+        :class="menuTerbuka ? 'translate-x-0' : 'translate-x-full'"
+      >
+        <div class="h-20 flex items-center justify-between px-margin-mobile border-b border-outline-variant/30 flex-shrink-0">
+          <img src="/logo-denanta.png" alt="Denanta TranSolution" class="h-12 w-auto" />
+          <button @click="toggleMenu" class="text-on-surface-variant hover:text-on-surface p-1 cursor-pointer border-0 bg-transparent">
+            <X class="w-6 h-6" />
           </button>
         </div>
-        <div v-else class="flex flex-col gap-2">
-          <router-link
-            to="/login"
-            @click="menuTerbuka = false"
-            class="w-full text-on-surface-variant hover:text-primary py-2.5 text-center font-semibold block"
+
+        <nav class="flex-grow overflow-y-auto tanpa-scrollbar px-margin-mobile py-6 flex flex-col gap-3">
+          <a @click="navigasiKe('/'); menuTerbuka = false" :class="kelasMenuBerandaMobile">Beranda</a>
+          <router-link to="/tentang" @click="menuTerbuka = false" :class="kelasMenuTentangMobile">Tentang Kami</router-link>
+          <button
+            type="button"
+            @click="bukaMenuLangganan"
+            :class="[kelasMenuLangganganMobile, 'w-full text-left border-0', route.path === '/berlangganan' ? '' : 'bg-transparent']"
           >
-            Masuk
-          </router-link>
-          <router-link
-            to="/register"
-            @click="menuTerbuka = false"
-            class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold block"
-          >
-            Daftar
-          </router-link>
+            {{ labelMenuLangganan }}
+          </button>
+        </nav>
+
+        <div class="px-margin-mobile py-6 border-t border-outline-variant/20 flex flex-col gap-2 flex-shrink-0">
+          <div v-if="isAuthenticated" class="flex flex-col gap-2">
+            <router-link
+              to="/profile/edit"
+              @click="menuTerbuka = false"
+              class="w-full bg-brand-tosca-light hover:bg-[#D5F0EB] text-primary py-2.5 rounded-xl text-center font-semibold flex items-center justify-center gap-2"
+            >
+              <User class="w-4 h-4" />
+              Edit Profil
+            </router-link>
+            <button
+              @click="navigasiDashboard"
+              class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0"
+            >
+              Dashboard
+            </button>
+          </div>
+          <div v-else class="flex flex-col gap-2">
+            <router-link
+              to="/login"
+              @click="menuTerbuka = false"
+              class="w-full text-on-surface-variant hover:text-primary py-2.5 text-center font-semibold block"
+            >
+              Masuk
+            </router-link>
+            <router-link
+              to="/register"
+              @click="menuTerbuka = false"
+              class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold block"
+            >
+              Daftar
+            </router-link>
+          </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </Teleport>
 
     <!-- Background Accents -->
     <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">

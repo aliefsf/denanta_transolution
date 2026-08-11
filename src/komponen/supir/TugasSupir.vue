@@ -24,6 +24,7 @@ import { ambilRuteJalan } from '../../layanan/navigasiLayanan';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 import { useAuth } from '../../komposabel/useAuth';
 import { gunakanRealtimeSubscription } from '../../layanan/realtimeLayanan';
+import { useResetHariBerganti } from '../../komposabel/useResetHariBerganti';
 
 const { currentUser } = useAuth();
 
@@ -168,6 +169,18 @@ onMounted(() => {
 onUnmounted(() => {
   saluranTugas?.unsubscribe();
   saluranTugas = null;
+});
+
+// Reset otomatis tepat pukul 00:00 WIB begitu halaman ini tetap terbuka
+// lintas tengah malam (mis. supir lupa menutup tab) -- daftarTugas
+// dikosongkan SEKETIKA (tanpa menunggu fetch selesai) supaya tugas hari
+// kemarin (apa pun statusnya -- selesai, berjalan, belum dimulai) langsung
+// hilang dari tampilan tepat waktu, baru menyusul fetch ulang utk tanggal
+// baru (kosong sampai Admin membuat penugasan baru -- lihat
+// useResetHariBerganti.ts).
+useResetHariBerganti(() => {
+  daftarTugas.value = [];
+  muatTugasHariIniDiam();
 });
 
 // Sekolah tujuan yang tersedia untuk sesi terpilih
