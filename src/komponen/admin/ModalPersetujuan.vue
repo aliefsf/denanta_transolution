@@ -48,7 +48,7 @@ watch(
   >
     <div class="space-y-4 text-xs text-on-surface-variant">
       <div class="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-amber-800 leading-relaxed">
-        Menolak pengajuan ini akan otomatis menonaktifkan status langganan siswa bersangkutan pada tanggal jatuh tempo, dan mengirimkan peringatan suspensi via WhatsApp.
+        Menolak pengajuan ini akan otomatis menonaktifkan status langganan siswa bersangkutan pada tanggal jatuh tempo, dan mengirimkan peringatan suspensi lewat notifikasi sistem.
       </div>
 
       <div class="space-y-2.5">

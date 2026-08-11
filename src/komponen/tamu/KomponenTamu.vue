@@ -16,7 +16,7 @@ const keunggulan = [
   },
   {
     judul: 'Notifikasi Instan',
-    deskripsi: 'Terima notifikasi status keberangkatan, ketibaan, dan keterlambatan via WhatsApp.',
+    deskripsi: 'Terima notifikasi status keberangkatan, ketibaan, dan keterlambatan langsung di aplikasi.',
     ikon: Clock,
   },
   {

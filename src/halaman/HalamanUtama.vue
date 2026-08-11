@@ -503,7 +503,7 @@ const namaPengguna = computed(() => {
         <div class="flex flex-col items-center text-center flex-1 relative z-10">
           <div class="w-20 h-20 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg shadow-primary/40 border-4 border-solid border-white">4</div>
           <h4 class="font-title-lg mb-2 text-on-background">Pantau Real-time</h4>
-          <p class="font-body-md text-on-surface-variant px-4">Terima notifikasi WhatsApp dan pantau perjalanan anak lewat web maps.</p>
+          <p class="font-body-md text-on-surface-variant px-4">Terima notifikasi aplikasi dan pantau perjalanan anak lewat web maps.</p>
         </div>
       </div>
     </section>

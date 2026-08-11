@@ -478,7 +478,7 @@ const ajukanPenundaan = async () => {
     statusPenundaan.value = 'menunggu';
     modalPenundaanTampil.value = false;
     hapusFileBukti();
-    picuToast('Pengajuan penundaan pembayaran berhasil dikirim ke Admin. Status WhatsApp akan dikirimkan segera.', 'sukses');
+    picuToast('Pengajuan penundaan pembayaran berhasil dikirim ke Admin. Anda akan menerima notifikasi sistem begitu diproses.', 'sukses');
   } catch (err: any) {
     picuToast(err.message || 'Gagal mengajukan penundaan pembayaran.', 'error');
   } finally {
@@ -550,7 +550,7 @@ const ajukanPenundaan = async () => {
         <div class="space-y-1 text-amber-800">
           <h4 class="font-bold text-amber-900 text-sm">Pemberitahuan Batas Pembayaran Bulanan</h4>
           <p class="leading-relaxed">
-            Pembayaran langganan Anda jatuh tempo pada tanggal <strong>{{ jatuhTempoTerdekat }}</strong>. Peringatan jatuh tempo otomatis akan dikirim ke WhatsApp Anda.
+            Pembayaran langganan Anda jatuh tempo pada tanggal <strong>{{ jatuhTempoTerdekat }}</strong>. Peringatan jatuh tempo otomatis akan dikirim lewat notifikasi sistem.
           </p>
         </div>
       </div>
