@@ -1,80 +1,106 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import { ShieldAlert } from 'lucide-vue-next';
 import TataLetakSupir from './tataletak/TataLetakSupir.vue';
 import DashboardSupir from '../komponen/supir/DashboardSupir.vue';
+import AbsensiSupir from '../komponen/supir/AbsensiSupir.vue';
 import TugasSupir from '../komponen/supir/TugasSupir.vue';
 import RiwayatSupir from '../komponen/supir/RiwayatSupir.vue';
 import ProfilSupir from '../komponen/supir/ProfilSupir.vue';
-import NotifikasiUtama from '../komponen/umum/NotifikasiUtama.vue';
+import NotifikasiSupir from '../komponen/supir/NotifikasiSupir.vue';
+import { ambilStatusKehadiran, ambilStatusAktifSupir, type StatusKehadiran } from '../layanan/supirLayanan';
 
 const route = useRoute();
 
-// Tab Aktif: dashboard, tugas, riwayat, profil
-const tabAktif = ref<'dashboard' | 'tugas' | 'riwayat' | 'profil' | string>('dashboard');
-const siapKerja = ref(true);
+// Tab Aktif: dashboard, absensi, tugas, riwayat, notifikasi, profil
+const tabAktif = ref<'dashboard' | 'absensi' | 'tugas' | 'riwayat' | 'notifikasi' | 'profil' | string>('dashboard');
+const statusKehadiran = ref<StatusKehadiran>('belum_diisi');
+
+// Akun yang dinonaktifkan Admin (togglAktifSupir() di adminLayanan.ts) hanya
+// boleh mengakses "Profil Saya" -- default true (optimistis) supaya tidak
+// ada kedipan layar terkunci sebelum status sebenarnya diketahui; begitu
+// fetch di onMounted selesai dan ternyata false, tabAktif dipaksa ke
+// 'profil' dan setiap percobaan pindah tab (baik dari sidebar maupun query
+// ?tab= di URL) ditolak selama akun masih nonaktif.
+const akunAktif = ref(true);
 
 // Sinkronkan tabAktif dengan route.query.tab secara reaktif melalui pemantauan fullPath
 watch(
   () => route.fullPath,
   () => {
     if (route.query.tab && typeof route.query.tab === 'string') {
-      tabAktif.value = route.query.tab;
+      tabAktif.value = akunAktif.value ? route.query.tab : 'profil';
     }
   },
   { immediate: true }
 );
 
-// Toast Alert
-const toastTampil = ref(false);
-const toastPesan = ref('');
-const toastTipe = ref<'sukses' | 'error' | 'info'>('info');
-
-const picuToast = (pesan: string, tipe: 'sukses' | 'error' | 'info' = 'info') => {
-  toastPesan.value = pesan;
-  toastTipe.value = tipe;
-  toastTampil.value = true;
+const ubahTab = (tab: string) => {
+  tabAktif.value = akunAktif.value ? tab : 'profil';
 };
 
-const ubahStatusSiap = (status: boolean) => {
-  siapKerja.value = status;
-  picuToast(
-    `Status kemudi diubah: ${status ? 'SIAP BERTUGAS (Notifikasi WhatsApp aktif)' : 'TIDAK SIAP (Layanan tugas dinonaktifkan)'}`,
-    status ? 'sukses' : 'error'
-  );
+watch(akunAktif, (aktif) => {
+  if (!aktif) tabAktif.value = 'profil';
+});
+
+// AbsensiSupir.vue yang memanggil perbaruiStatusKehadiran() sendiri (termasuk
+// menampilkan toast-nya sendiri) -- di sini cukup sinkronkan status terkini
+// supaya badge header & ringkasan Dashboard ikut ter-update tanpa reload.
+const sinkronStatusKehadiran = (status: StatusKehadiran) => {
+  statusKehadiran.value = status;
 };
+
+onMounted(async () => {
+  try {
+    statusKehadiran.value = await ambilStatusKehadiran();
+  } catch {
+    // biarkan default 'belum_diisi' bila gagal memuat status awal
+  }
+  try {
+    akunAktif.value = await ambilStatusAktifSupir();
+  } catch {
+    // Gagal memuat -- biarkan default true (optimistis), lebih baik daripada
+    // salah mengunci akun aktif hanya karena request sempat gagal/timeout.
+  }
+});
 </script>
 
 <template>
-  <div class="min-h-screen bg-warnaUtama">
-    <!-- Toast Alert -->
-    <NotifikasiUtama 
-      :tampil="toastTampil" 
-      :pesan="toastPesan" 
-      :tipe="toastTipe" 
-      @tutup="toastTampil = false" 
-    />
-
-    <TataLetakSupir 
-      :tab-aktif="tabAktif" 
-      :siap-kerja="siapKerja"
-      @ubah-tab="tabAktif = $event"
-      @ubah-siap="ubahStatusSiap"
+  <div class="min-h-screen bg-background">
+    <TataLetakSupir
+      :tab-aktif="tabAktif"
+      :status-kehadiran="statusKehadiran"
+      :akun-aktif="akunAktif"
+      @ubah-tab="ubahTab"
     >
-      <DashboardSupir 
-        v-if="tabAktif === 'dashboard'" 
-        :siap-kerja="siapKerja"
-        @ubah-tab="tabAktif = $event" 
-        @ubah-siap="ubahStatusSiap"
+      <div v-if="!akunAktif" class="mb-6 flex items-start gap-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl px-4 py-3">
+        <ShieldAlert class="w-4.5 h-4.5 flex-shrink-0 mt-0.5 text-rose-600" />
+        <p class="leading-relaxed">
+          <strong>Akun Anda dinonaktifkan sementara oleh Admin.</strong> Anda hanya dapat mengakses halaman Profil selama akun berstatus nonaktif.
+        </p>
+      </div>
+
+      <DashboardSupir
+        v-if="tabAktif === 'dashboard'"
+        :status-kehadiran="statusKehadiran"
+        @ubah-tab="ubahTab"
       />
-      <TugasSupir 
-        v-else-if="tabAktif === 'tugas'" 
+      <AbsensiSupir
+        v-else-if="tabAktif === 'absensi'"
+        @ubah-status="sinkronStatusKehadiran"
       />
-      <RiwayatSupir 
-        v-else-if="tabAktif === 'riwayat'" 
+      <TugasSupir
+        v-else-if="tabAktif === 'tugas'"
       />
-      <ProfilSupir 
-        v-else-if="tabAktif === 'profil'" 
+      <RiwayatSupir
+        v-else-if="tabAktif === 'riwayat'"
+      />
+      <NotifikasiSupir
+        v-else-if="tabAktif === 'notifikasi'"
+      />
+      <ProfilSupir
+        v-else-if="tabAktif === 'profil'"
       />
     </TataLetakSupir>
   </div>

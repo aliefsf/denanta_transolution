@@ -1,37 +1,73 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuth } from '../komposabel/useAuth';
 import { useAuthStore } from '../penyimpanan/authStore';
 import { supabase } from '../layanan/supabase';
-import { 
-  Bus, Mail, KeyRound, User, Phone, CheckCircle, 
-  AlertTriangle, Loader2, Users, ShieldAlert,
-  Eye, EyeOff, MailCheck, ChevronLeft
+import { kompresiGambar } from '../bantuan/kompresiGambar';
+import {
+  Mail, KeyRound, User, Phone,
+  AlertTriangle, Loader2, Camera,
+  Eye, EyeOff
 } from 'lucide-vue-next';
 
 const router = useRouter();
+const route = useRoute();
 const auth = useAuth();
 const authStore = useAuthStore();
+
+// Jika halaman ini dibuka lewat redirect guard /berlangganan (lihat rute/index.ts),
+// lanjutkan ke wizard berlangganan setelah berhasil daftar. Jika dibuka langsung
+// lewat tombol "Daftar" di navbar/hero, kembalikan ke landing page.
+const tujuanSetelahDaftar = route.query.lanjut === 'berlangganan' ? '/berlangganan' : '/';
 
 const namaLengkap = ref('');
 const email = ref('');
 const nomorTelepon = ref('');
-const peran = ref<'orangtua' | 'supir'>('orangtua');
+const peran = 'orangtua' as const;
 const kataSandi = ref('');
 const konfirmasiSandi = ref('');
 
 const errorPesan = ref<string | null>(null);
-const suksesDaftar = ref(false);
 const sedangLoading = ref(false);
 
 const tunjukkanSandi = ref(false);
 const tunjukkanKonfirmasiSandi = ref(false);
 
-// OTP Verification State
-const otpInputs = ref<any[]>([]);
-const otpCodes = ref<string[]>(['', '', '', '', '', '']);
-const verifikasiSukses = ref(false);
+// Foto profil (OPSIONAL) -- dikompresi jadi JPEG kecil (base64) di klien
+// lewat kompresiGambar() lalu dikirim sebagai metadata signUp() (lihat
+// auth.daftar() di useAuth.ts). BELUM bisa diunggah ke Storage bucket biasa
+// di titik ini karena akun belum punya sesi aktif (konfirmasi email/OTP
+// masih tertunda) -- trigger database yang menyimpannya ke pengguna.foto_profil.
+const fotoProfil = ref('');
+const inputFotoProfil = ref<HTMLInputElement | null>(null);
+const errorFotoProfil = ref('');
+
+const pilihFotoProfil = async (e: Event) => {
+  errorFotoProfil.value = '';
+  const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+  if (!file) return;
+
+  if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+    errorFotoProfil.value = 'Format foto harus PNG atau JPG.';
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    errorFotoProfil.value = 'Ukuran foto maksimal 5 MB.';
+    return;
+  }
+
+  try {
+    fotoProfil.value = await kompresiGambar(file);
+  } catch {
+    errorFotoProfil.value = 'Gagal memproses foto, silakan coba foto lain.';
+  }
+};
+
+const hapusFotoProfil = () => {
+  fotoProfil.value = '';
+  if (inputFotoProfil.value) inputFotoProfil.value.value = '';
+};
 
 const tanganiDaftar = async () => {
   if (!namaLengkap.value || !email.value || !kataSandi.value || !konfirmasiSandi.value) {
@@ -57,73 +93,33 @@ const tanganiDaftar = async () => {
     if (!client) {
       // Perilaku Simulasi Lokal/Mock jika Supabase tidak dikonfigurasi
       await new Promise(resolve => setTimeout(resolve, 1500));
-      suksesDaftar.value = true;
+      authStore.sudahLogin = true;
+      authStore.peran = 'orangtua';
+      router.push(tujuanSetelahDaftar);
       return;
     }
 
+    // Konfirmasi email WAJIB aktif di pengaturan Supabase Auth (Confirm email
+    // = ON, autoconfirm dimatikan) supaya signUp() TIDAK langsung membuat
+    // sesi aktif -- akun baru harus lewat verifikasi kode OTP dulu (lihat
+    // VerifikasiOtp.vue) sebelum benar-benar bisa dipakai untuk login.
     await auth.daftar(
       email.value,
       kataSandi.value,
       namaLengkap.value,
-      peran.value,
-      nomorTelepon.value
+      peran,
+      nomorTelepon.value,
+      fotoProfil.value
     );
-    suksesDaftar.value = true;
+    router.push({
+      path: '/verifikasi-otp',
+      query: {
+        email: email.value,
+        ...(route.query.lanjut === 'berlangganan' ? { lanjut: 'berlangganan' } : {})
+      }
+    });
   } catch (err: any) {
     errorPesan.value = err.message || 'Terjadi kesalahan saat mendaftar';
-  } finally {
-    sedangLoading.value = false;
-  }
-};
-
-const tanganiOtpInput = (index: number, event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const value = target.value;
-  otpCodes.value[index] = value;
-  
-  if (value.length === 1 && index < 5) {
-    // Pindah fokus ke input berikutnya
-    otpInputs.value[index + 1]?.focus();
-  }
-};
-
-const tanganiOtpKeydown = (index: number, event: KeyboardEvent) => {
-  if (event.key === 'Backspace' && otpCodes.value[index] === '' && index > 0) {
-    // Hapus dan pindah fokus ke input sebelumnya
-    otpInputs.value[index - 1]?.focus();
-  }
-};
-
-const tanganiVerifikasiOtp = async () => {
-  const token = otpCodes.value.join('');
-  if (token.length < 6) {
-    errorPesan.value = 'Silakan masukkan 6 digit kode OTP';
-    return;
-  }
-
-  sedangLoading.value = true;
-  errorPesan.value = null;
-
-  try {
-    const client = supabase;
-    if (client && email.value) {
-      const { error: errVerify } = await client.auth.verifyOtp({
-        email: email.value,
-        token: token,
-        type: 'signup'
-      });
-      if (errVerify) throw errVerify;
-    } else {
-      // Simulasi Mock lokal
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    }
-    
-    verifikasiSukses.value = true;
-    setTimeout(() => {
-      router.push('/login');
-    }, 2000);
-  } catch (err: any) {
-    errorPesan.value = err.message || 'Kode verifikasi OTP salah atau kedaluwarsa';
   } finally {
     sedangLoading.value = false;
   }
@@ -146,7 +142,7 @@ const loginDenganGoogle = async () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       authStore.sudahLogin = true;
       authStore.peran = 'orangtua';
-      router.push('/orangtua');
+      router.push('/');
     }
   } catch (err: any) {
     errorPesan.value = err.message || 'Gagal masuk dengan Google';
@@ -155,24 +151,6 @@ const loginDenganGoogle = async () => {
   }
 };
 
-const kirimUlangOtp = () => {
-  errorPesan.value = null;
-  otpCodes.value = ['', '', '', '', '', ''];
-  alert('Kode verifikasi baru telah dikirimkan ke email Anda.');
-};
-
-// Masking email helper
-const sensorEmail = (val: string) => {
-  if (!val) return 'user@example.com';
-  const split = val.split('@');
-  if (split.length < 2) return val;
-  const name = split[0];
-  const domain = split[1];
-  if (name.length <= 3) {
-    return `${name.substring(0, 1)}***@${domain}`;
-  }
-  return `${name.substring(0, 3)}***@${domain}`;
-};
 </script>
 
 <template>
@@ -184,8 +162,8 @@ const sensorEmail = (val: string) => {
 
     <main class="relative z-10 w-full max-w-md mx-auto">
       
-      <!-- STEP 1: Buat Akun (Form Pendaftaran) -->
-      <div v-if="!suksesDaftar" class="bg-surface-container-lowest rounded-[20px] custom-shadow p-6 md:p-8 flex flex-col relative overflow-hidden text-left">
+      <!-- Buat Akun (Form Pendaftaran) -->
+      <div class="bg-surface-container-lowest rounded-[20px] custom-shadow p-6 md:p-8 flex flex-col relative overflow-hidden text-left">
         
         <!-- Loading Overlay -->
         <div v-if="sedangLoading" class="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center z-20">
@@ -194,12 +172,6 @@ const sensorEmail = (val: string) => {
             <p class="text-xs text-primary-container font-semibold">Memproses Pendaftaran...</p>
           </div>
         </div>
-
-        <!-- Logo -->
-        <router-link to="/" class="flex items-center gap-1.5 mb-6 text-on-surface hover:text-primary transition-colors inline-flex w-fit">
-          <Bus class="h-6 w-6 text-primary-container" />
-          <span class="font-title-lg text-title-lg font-bold">Denanta</span>
-        </router-link>
 
         <div class="mb-6">
           <h1 class="font-headline-lg text-headline-lg text-on-surface mb-2">Daftar Akun</h1>
@@ -213,31 +185,27 @@ const sensorEmail = (val: string) => {
         </div>
 
         <form class="flex flex-col gap-4" @submit.prevent="tanganiDaftar">
-          <!-- Role Selection (Required by DB) -->
-          <div>
-            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Daftar Sebagai
-            </label>
-            <div class="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                @click="peran = 'orangtua'"
-                class="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border border-solid transition-all cursor-pointer"
-                :class="peran === 'orangtua' ? 'bg-primary-container border-primary-container text-white' : 'bg-surface-bright border-outline-variant text-on-surface-variant hover:text-primary-container'"
-              >
-                <Users class="w-4 h-4" />
-                Orang Tua
-              </button>
-              <button
-                type="button"
-                @click="peran = 'supir'"
-                class="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border border-solid transition-all cursor-pointer"
-                :class="peran === 'supir' ? 'bg-primary-container border-primary-container text-white' : 'bg-surface-bright border-outline-variant text-on-surface-variant hover:text-primary-container'"
-              >
-                <ShieldAlert class="w-4 h-4" />
-                Supir / Driver
-              </button>
-            </div>
+          <!-- Foto Profil (Opsional) -->
+          <div class="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              class="relative w-20 h-20 rounded-full bg-surface-bright border border-solid border-outline-variant flex items-center justify-center overflow-hidden cursor-pointer hover:border-primary-container transition-colors"
+              @click="inputFotoProfil?.click()"
+            >
+              <img v-if="fotoProfil" :src="fotoProfil" alt="Foto profil" class="w-full h-full object-cover" />
+              <Camera v-else class="w-6 h-6 text-on-surface-variant" />
+            </button>
+            <input ref="inputFotoProfil" type="file" accept="image/png,image/jpeg,image/jpg" class="hidden" @change="pilihFotoProfil" />
+            <button
+              v-if="fotoProfil"
+              type="button"
+              class="text-[11px] text-error hover:underline bg-transparent border-0 cursor-pointer p-0"
+              @click="hapusFotoProfil"
+            >
+              Hapus Foto
+            </button>
+            <p v-else class="text-[11px] text-on-surface-variant">Foto Profil (Opsional)</p>
+            <p v-if="errorFotoProfil" class="text-[11px] text-error">{{ errorFotoProfil }}</p>
           </div>
 
           <!-- Full Name (Required by DB) -->
@@ -259,7 +227,7 @@ const sensorEmail = (val: string) => {
               v-model="nomorTelepon"
               required
               class="w-full bg-surface-bright border border-solid border-outline-variant rounded-[10px] py-3 pl-10 pr-4 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container transition-colors" 
-              placeholder="Nomor Telepon / WhatsApp" 
+              placeholder="Contoh: 08123456789 (Nomor WhatsApp)"
               type="tel"
             />
           </div>
@@ -346,84 +314,6 @@ const sensorEmail = (val: string) => {
 
         <p class="font-body-md text-body-md text-center text-on-surface-variant">
           Sudah punya akun? <router-link class="text-primary-container font-bold hover:underline" to="/login">Masuk di sini</router-link>
-        </p>
-      </div>
-
-      <!-- STEP 2: Verifikasi Email (Kode OTP) -->
-      <div v-else class="bg-surface-container-lowest rounded-[20px] custom-shadow p-6 md:p-8 flex flex-col items-center text-center relative overflow-hidden">
-        
-        <!-- Loading Overlay -->
-        <div v-if="sedangLoading" class="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center z-20">
-          <div class="text-center space-y-2">
-            <Loader2 class="w-10 h-10 text-primary-container animate-spin mx-auto" />
-            <p class="text-xs text-primary-container font-semibold">Memverifikasi OTP...</p>
-          </div>
-        </div>
-
-        <!-- Success Alert Inner -->
-        <div v-if="verifikasiSukses" class="absolute inset-0 bg-white/95 flex flex-col items-center justify-center p-6 z-30 text-center gap-4">
-          <div class="inline-flex items-center justify-center p-4 bg-emerald-100 text-emerald-600 rounded-full border border-solid border-emerald-300">
-            <CheckCircle class="w-12 h-12" />
-          </div>
-          <h3 class="text-xl font-bold text-on-surface">Verifikasi Berhasil!</h3>
-          <p class="text-sm text-slate-500 max-w-xs leading-relaxed">
-            Email Anda telah berhasil diverifikasi. Mengalihkan Anda ke halaman login...
-          </p>
-        </div>
-
-        <button 
-          type="button"
-          class="absolute left-4 top-4 text-on-surface-variant hover:text-primary transition-colors bg-transparent border-0 cursor-pointer p-2 flex items-center gap-1 text-xs"
-          @click="suksesDaftar = false"
-        >
-          <ChevronLeft class="w-4 h-4" />
-          Kembali
-        </button>
-
-        <div class="w-16 h-16 bg-secondary-fixed rounded-full flex items-center justify-center mb-6 text-primary-container mt-6">
-          <MailCheck class="w-8 h-8" />
-        </div>
-
-        <div class="mb-6 w-full">
-          <h2 class="font-headline-md text-headline-md text-on-surface mb-2">Verifikasi Email Kamu</h2>
-          <p class="font-body-md text-body-md text-on-surface-variant leading-relaxed">
-            Kami telah mengirimkan kode OTP ke email<br/>
-            <strong class="text-on-surface font-semibold">{{ sensorEmail(email) }}</strong>
-          </p>
-        </div>
-
-        <!-- Alert Error inside OTP -->
-        <div v-if="errorPesan" class="mb-4 bg-error-container/20 border border-solid border-error p-3.5 rounded-xl flex items-start gap-2.5 w-full text-left">
-          <AlertTriangle class="w-5 h-5 text-error flex-shrink-0 mt-0.5" />
-          <div class="text-xs text-error leading-normal">{{ errorPesan }}</div>
-        </div>
-
-        <div class="flex gap-2 justify-center mb-6 w-full">
-          <input 
-            v-for="(_, index) in otpCodes" 
-            :key="index"
-            :ref="(el: any) => { if (el) otpInputs[index] = el }"
-            v-model="otpCodes[index]"
-            maxlength="1" 
-            type="text"
-            class="w-12 h-14 bg-surface-bright border border-solid rounded-[10px] text-center font-headline-md text-headline-md text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container transition-colors"
-            :class="otpCodes[index] !== '' ? 'border-primary-container ring-1 ring-primary-container' : 'border-outline-variant'"
-            @input="tanganiOtpInput(index, $event)"
-            @keydown="tanganiOtpKeydown(index, $event)"
-          />
-        </div>
-
-        <button 
-          type="button"
-          class="w-full bg-primary-container hover:bg-primary text-on-primary rounded-[12px] py-3 font-label-md text-label-md transition-colors mb-6 cursor-pointer border-0 shadow-sm"
-          @click="tanganiVerifikasiOtp"
-        >
-          Verifikasi
-        </button>
-
-        <p class="font-body-md text-body-md text-outline">
-          Belum menerima kode?<br/>
-          <a class="text-primary-container font-semibold hover:underline mt-1 inline-block cursor-pointer" @click="kirimUlangOtp">Kirim Ulang Kode</a>
         </p>
       </div>
 

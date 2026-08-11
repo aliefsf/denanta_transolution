@@ -2,25 +2,31 @@
 import { computed } from 'vue';
 
 interface Props {
-  status: 'berangkat' | 'sekolah' | 'pulang' | 'rumah' | 'absen' | string;
+  status: 'terjadwal' | 'penjemputan' | 'menuju_sekolah' | 'sekolah' | 'pulang' | 'sampai_tujuan' | 'rumah' | 'absen' | string;
 }
 
 const props = defineProps<Props>();
 
 const konfigurasiBadge = computed(() => {
   switch (props.status.toLowerCase()) {
-    case 'berangkat':
-      return { teks: 'Pergi Sekolah', kelas: 'bg-amber-500/10 text-amber-400 border-amber-500/30' };
+    case 'terjadwal':
+      return { teks: 'Sedang di Rumah', kelas: 'bg-outline-variant/10 text-on-surface-variant border-outline-variant/40' };
+    case 'penjemputan':
+      return { teks: 'Sedang Dijemput', kelas: 'bg-amber-50 text-amber-700 border-amber-200' };
+    case 'menuju_sekolah':
+      return { teks: 'Menuju Sekolah', kelas: 'bg-amber-50 text-amber-700 border-amber-200' };
     case 'sekolah':
-      return { teks: 'Di Sekolah', kelas: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' };
+      return { teks: 'Di Sekolah', kelas: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
     case 'pulang':
-      return { teks: 'Perjalanan Pulang', kelas: 'bg-orange-500/10 text-orange-400 border-orange-500/30' };
+      return { teks: 'Perjalanan Pulang', kelas: 'bg-orange-50 text-orange-700 border-orange-200' };
+    case 'sampai_tujuan':
+      return { teks: 'Sampai Tujuan', kelas: 'bg-blue-50 text-blue-700 border-blue-200' };
     case 'rumah':
-      return { teks: 'Tiba di Rumah', kelas: 'bg-blue-500/10 text-blue-400 border-blue-500/30' };
+      return { teks: 'Sedang di Rumah', kelas: 'bg-outline-variant/10 text-on-surface-variant border-outline-variant/40' };
     case 'absen':
-      return { teks: 'Absen/Libur', kelas: 'bg-rose-500/10 text-rose-400 border-rose-500/30' };
+      return { teks: 'Absen/Libur', kelas: 'bg-rose-50 text-rose-700 border-rose-200' };
     default:
-      return { teks: 'Belum Aktif', kelas: 'bg-slate-500/10 text-slate-400 border-slate-500/30' };
+      return { teks: 'Belum Aktif', kelas: 'bg-outline-variant/10 text-on-surface-variant border-outline-variant/40' };
   }
 });
 </script>

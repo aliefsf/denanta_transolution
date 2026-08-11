@@ -55,7 +55,7 @@ watch(() => props.tampil, () => {
     >
       <div
         v-if="tampil"
-        class="fixed top-4 right-4 z-55 max-w-sm w-full bg-warnaSekunder border rounded-xl shadow-2xl pointer-events-auto overflow-hidden flex items-stretch"
+        class="fixed top-4 right-4 z-[9999] max-w-sm w-full bg-warnaSekunder border rounded-xl shadow-2xl pointer-events-auto overflow-hidden flex items-stretch"
         :class="{
           'border-emerald-500/40': tipe === 'sukses',
           'border-rose-500/40': tipe === 'error',

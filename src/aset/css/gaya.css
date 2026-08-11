@@ -2,14 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Tema gelap global untuk branding Denanta TranSolution */
+/* Latar default html/body -- HARUS sama dengan token Tailwind `background`/
+   `on-background` (tailwind.config.js) yang dipakai semua halaman yang
+   benar-benar aktif (landing, dashboard Admin/OrangTua/Supir semuanya pakai
+   class `bg-background`/`text-on-background`). Sebelumnya nilai di sini
+   masih warna tema gelap lama (`warnaUtama` #1a1a2e) padahal
+   TataLetakTamu.vue/NavbarTamu.vue (satu-satunya pemakai tema gelap itu)
+   sudah tidak pernah dirender dari rute manapun -- akibatnya browser
+   menampilkan latar gelap sekilas (flash) sebelum Vue selesai mount dan
+   mengecat ulang jadi terang, terlihat seperti halaman kosong gelap setiap
+   kali situs dibuka/direfresh.
+*/
 html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background-color: #1a1a2e; /* warnaUtama */
-  color: #e2e8f0;
-  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f5fbf7; /* samakan dengan token Tailwind `background` */
+  color: #171d1b; /* samakan dengan token Tailwind `on-background` */
+  font-family: 'Poppins', system-ui, -apple-system, sans-serif;
 }
 
 /* Custom scrollbar */
@@ -47,5 +57,16 @@ html, body {
   background-image: radial-gradient(#62dac0 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: -10px -10px;
+}
+
+/* Sembunyikan scrollbar visual pada panel dashboard (sidebar & area konten)
+   tanpa mematikan kemampuan scroll itu sendiri -- dipakai di TataLetakAdmin/
+   OrangTua/Supir.vue. */
+.tanpa-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge lama */
+}
+.tanpa-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge berbasis Chromium */
 }
 

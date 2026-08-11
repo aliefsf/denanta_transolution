@@ -10,15 +10,15 @@ const props = defineProps<Props>();
 const konfigurasiBadge = computed(() => {
   switch (props.status.toLowerCase()) {
     case 'lunas':
-      return { teks: 'Lunas', kelas: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' };
+      return { teks: 'Lunas', kelas: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
     case 'menunggu':
-      return { teks: 'Belum Bayar', kelas: 'bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse' };
+      return { teks: 'Belum Bayar', kelas: 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse' };
     case 'kedaluwarsa':
-      return { teks: 'Kedaluwarsa', kelas: 'bg-rose-500/10 text-rose-400 border-rose-500/30' };
+      return { teks: 'Kedaluwarsa', kelas: 'bg-rose-50 text-rose-700 border-rose-200' };
     case 'ditangguhkan':
-      return { teks: 'Ditangguhkan', kelas: 'bg-orange-500/10 text-orange-400 border-orange-500/30' };
+      return { teks: 'Ditangguhkan', kelas: 'bg-orange-50 text-orange-700 border-orange-200' };
     default:
-      return { teks: 'Draft', kelas: 'bg-slate-500/10 text-slate-400 border-slate-500/30' };
+      return { teks: 'Draft', kelas: 'bg-outline-variant/10 text-on-surface-variant border-outline-variant/40' };
   }
 });
 </script>

@@ -6,6 +6,9 @@ interface Props {
   varian?: 'utama' | 'sekunder' | 'aksen' | 'bahaya' | 'garis-luar';
   ukuran?: 'kecil' | 'sedang' | 'besar';
   nonaktif?: boolean;
+  // 'gelap' dipakai halaman dengan tema lama (Orang Tua/Supir), 'terang'
+  // dipakai halaman dengan palet Material terang (Admin, Berlangganan, dst).
+  tema?: 'gelap' | 'terang';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -13,9 +16,27 @@ const props = withDefaults(defineProps<Props>(), {
   varian: 'utama',
   ukuran: 'sedang',
   nonaktif: false,
+  tema: 'gelap',
 });
 
 const kelasVarian = computed(() => {
+  if (props.tema === 'terang') {
+    switch (props.varian) {
+      case 'utama':
+        return 'bg-primary hover:bg-primary/90 text-white shadow-md focus:ring-primary';
+      case 'sekunder':
+        return 'bg-surface-container-high hover:bg-surface-container text-on-surface shadow focus:ring-outline';
+      case 'aksen':
+        return 'bg-primary-container hover:bg-opacity-90 text-white focus:ring-primary-container';
+      case 'bahaya':
+        return 'bg-error hover:bg-error/90 text-white focus:ring-error';
+      case 'garis-luar':
+        return 'bg-transparent border border-outline-variant text-on-surface-variant hover:bg-surface-container focus:ring-outline';
+      default:
+        return 'bg-primary text-white';
+    }
+  }
+
   switch (props.varian) {
     case 'utama':
       return 'bg-warnaTombol hover:bg-opacity-90 text-white shadow-md focus:ring-warnaTombol';
@@ -50,8 +71,8 @@ const kelasUkuran = computed(() => {
   <button
     :type="tipe"
     :disabled="nonaktif"
-    class="inline-flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-warnaUtama disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
-    :class="[kelasVarian, kelasUkuran]"
+    class="inline-flex items-center justify-center rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
+    :class="[kelasVarian, kelasUkuran, tema === 'terang' ? 'focus:ring-offset-surface' : 'focus:ring-offset-warnaUtama']"
   >
     <slot />
   </button>

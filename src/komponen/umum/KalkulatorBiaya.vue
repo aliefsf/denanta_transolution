@@ -1,30 +1,35 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Info } from 'lucide-vue-next';
 import KartuUtama from './KartuUtama.vue';
 import { formatMataUang } from '../../bantuan/formatMataUang';
+import { ambilPengaturanTarif, hitungBiayaBulanan, hitungBiayaHarian, type PengaturanTarifRow } from '../../layanan/tarifLayanan';
+import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 
 const jenisLayanan = ref<'antar_jemput' | 'antar_saja' | 'jemput_saja'>('antar_jemput');
 const jenisLangganan = ref<'bulanan' | 'harian'>('bulanan');
 const jarakKm = ref(5);
-const hariSekolah = ref(5); // Jumlah hari sekolah dalam seminggu
+
+const tarif = ref<PengaturanTarifRow | null>(null);
+const sedangMemuat = ref(true);
+
+onMounted(async () => {
+  try {
+    tarif.value = await denganBatasWaktu(ambilPengaturanTarif(), 20000);
+  } catch {
+    // Biarkan tarif tetap null; tampilan estimasi disembunyikan bila gagal dimuat
+  } finally {
+    sedangMemuat.value = false;
+  }
+});
 
 // Hitung biaya berdasarkan pilihan
 const biayaEstimasi = computed(() => {
+  if (!tarif.value) return 0;
   if (jenisLangganan.value === 'harian') {
-    // Tarif dasar Rp 10.000 + Rp 3.000 per km
-    const tarifDasar = 10000;
-    const tarifPerKm = 3000;
-    return tarifDasar + (tarifPerKm * jarakKm.value);
-  } else {
-    // Bulanan: tarif per hari * total hari kerja sebulan (hariSekolah * 4)
-    let tarifHarian = 15000;
-    if (jenisLayanan.value === 'antar_jemput') {
-      tarifHarian = 25000;
-    }
-    const totalHariSebulan = hariSekolah.value * 4;
-    return tarifHarian * totalHariSebulan;
+    return hitungBiayaHarian(tarif.value, jarakKm.value);
   }
+  return hitungBiayaBulanan(tarif.value, jenisLayanan.value);
 });
 </script>
 
@@ -91,26 +96,14 @@ const biayaEstimasi = computed(() => {
           />
         </div>
 
-        <!-- Input Hari Sekolah (Bulanan) -->
-        <div v-else>
-          <div class="flex justify-between text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-            <span>Hari Sekolah se-Minggu</span>
-            <span class="text-warnaTombol font-mono">{{ hariSekolah }} Hari</span>
-          </div>
-          <input 
-            type="range" 
-            min="1" 
-            max="6" 
-            v-model.number="hariSekolah" 
-            class="w-full accent-warnaTombol bg-warnaUtama h-2 rounded-lg cursor-pointer"
-          />
-        </div>
       </div>
 
       <!-- Hasil Output Estimasi -->
       <div class="p-4 bg-warnaUtama/50 border border-warnaAksen/20 rounded-xl space-y-2 text-center">
         <p class="text-[11px] text-slate-400 uppercase tracking-widest font-bold">Estimasi Biaya</p>
-        <p class="text-3xl font-black text-white tracking-wide">
+        <p v-if="sedangMemuat" class="text-sm text-slate-400">Memuat tarif terbaru...</p>
+        <p v-else-if="!tarif" class="text-sm text-slate-400">Gagal memuat tarif, silakan muat ulang halaman.</p>
+        <p v-else class="text-3xl font-black text-white tracking-wide">
           {{ formatMataUang(biayaEstimasi) }}
           <span class="text-xs font-normal text-slate-400">
             / {{ jenisLangganan === 'harian' ? 'trip' : 'bulan' }}
@@ -122,7 +115,7 @@ const biayaEstimasi = computed(() => {
       <div class="flex gap-2 text-[10px] text-slate-400 leading-relaxed bg-warnaUtama/20 p-3 rounded-lg border border-warnaAksen/10">
         <Info class="w-4 h-4 text-warnaTombol flex-shrink-0" />
         <p v-if="jenisLangganan === 'bulanan'">
-          *Estimasi di atas dihitung berdasarkan rata-rata {{ hariSekolah * 4 }} hari penjemputan per-bulan. Tarif bulanan flat dan tidak dipengaruhi fluktuasi rute harian.
+          *Tarif bulanan flat sesuai jenis layanan, tidak dipengaruhi jarak maupun jumlah hari penjemputan. Jika jadwal pulang anak berubah di luar jadwal, berlaku biaya tambahan sesuai jarak.
         </p>
         <p v-else>
           *Biaya harian dihitung otomatis menggunakan GPS supir berdasarkan jarak penjemputan sebenarnya ke sekolah.

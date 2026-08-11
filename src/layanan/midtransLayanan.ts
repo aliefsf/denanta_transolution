@@ -1,8 +1,15 @@
 import { supabase } from './supabase';
+import { ambilWaktuSekarang } from '../bantuan/waktuSimulasi';
 
-const kunciKlien = import.meta.env.VITE_MIDTRANS_CLIENT_KEY || 'SB-Mid-client-demo';
-const kunciServer = import.meta.env.VITE_MIDTRANS_SERVER_KEY || 'SB-Mid-server-demo';
-const isSandbox = true; // Mode Sandbox untuk development/pengujian
+const kunciKlien = import.meta.env.VITE_MIDTRANS_CLIENT_KEY;
+const isSandbox = import.meta.env.VITE_MIDTRANS_IS_PRODUCTION !== 'true';
+
+function klienWajibAda() {
+  if (!supabase) {
+    throw new Error('Supabase tidak dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_ANON_KEY di file .env');
+  }
+  return supabase;
+}
 
 // Helper untuk memuat script Snap.js secara dinamis di frontend
 export function muatScriptSnap(): Promise<boolean> {
@@ -14,67 +21,83 @@ export function muatScriptSnap(): Promise<boolean> {
 
     const script = document.createElement('script');
     script.id = 'midtrans-snap-script';
-    // Gunakan URL Sandbox atau Production sesuai env
-    script.src = isSandbox 
+    script.src = isSandbox
       ? 'https://app.sandbox.midtrans.com/snap/snap.js'
       : 'https://app.midtrans.com/snap/snap.js';
     script.setAttribute('data-client-key', kunciKlien);
-    
+
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
-    
+
     document.body.appendChild(script);
   });
 }
 
-// Interface parameter transaksi
-interface DetailPelanggan {
-  nama: string;
-  email: string;
-  telepon: string;
-}
-
-interface DetailItem {
-  id: string;
-  harga: number;
-  nama: string;
-  kuantitas: number;
-}
-
 /**
- * Backend Mock / Client API Helper untuk membuat transaksi Snap Midtrans
- * POST /api/pembayaran/buat
+ * Meminta token Snap yang SUNGGUHAN dari Midtrans lewat Edge Function
+ * "buat-transaksi-midtrans" (server yang memegang Server Key). Lihat
+ * supabase/functions/buat-transaksi-midtrans/index.ts untuk detail kenapa
+ * ini tidak boleh dipanggil langsung ke API Midtrans dari client.
+ *
+ * Menerima SATU atau LEBIH pembayaranId sekaligus (Pembayaran Gabungan
+ * Multi-Anak) -- kalau lebih dari satu, semuanya dilunasi lewat SATU
+ * transaksi Snap untuk totalnya (Edge Function yang menjumlahkan & menaruh
+ * order_id yang sama di semua baris pembayaran terkait).
  */
-export async function buatTransaksiMidtrans(
-  idPesanan: string,
-  jumlahTotal: number,
-  detailPelanggan: DetailPelanggan,
-  detailItem: DetailItem[]
-): Promise<{ tokenSnap: string; urlRedirect: string }> {
-  // Simulasi pemanggilan API backend /api/pembayaran/buat
-  console.log('Meminta token Snap dari backend Midtrans...', { idPesanan, jumlahTotal, detailPelanggan, detailItem });
+export async function buatTransaksiMidtrans(pembayaranIds: string | string[]): Promise<{ token: string; urlRedirect: string }> {
+  const client = klienWajibAda();
+  const idList = Array.isArray(pembayaranIds) ? pembayaranIds : [pembayaranIds];
 
-  // Simulasi jeda jaringan
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  // SENGAJA pakai fetch() langsung, bukan client.functions.invoke() --
+  // supabase-js@2.47.10 membungkus response non-2xx jadi FunctionsHttpError
+  // generik ("Edge Function returned a non-2xx status code") dan pesan JSON
+  // asli yang sudah kita tulis di response body (alasan sebenarnya, mis.
+  // error dari Midtrans) tidak pernah sampai ke sini -- terbukti tidak bisa
+  // digali ulang lewat error.context.clone().json() (kemungkinan body
+  // stream sudah kepakai duluan oleh internal invoke()). fetch() manual
+  // memberi kontrol penuh membaca body persis sekali di sini.
+  const { data: sessionData } = await client.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error('Sesi login tidak valid, silakan login ulang.');
 
-  // Buat mock token Snap dan URL pembayaran
-  const tokenSnapMock = `snap-token-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-  const urlRedirectMock = `https://app.sandbox.midtrans.com/snap/v2/vtweb/${tokenSnapMock}`;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
-  return {
-    tokenSnap: tokenSnapMock,
-    urlRedirect: urlRedirectMock
-  };
+  const res = await fetch(`${supabaseUrl}/functions/v1/buat-transaksi-midtrans`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+      apikey: anonKey
+    },
+    // waktuKlien: dititipkan supaya midtrans-webhook (Edge Function yang
+    // dipanggil langsung oleh Midtrans, tidak pernah tahu localStorage
+    // klien) bisa menghitung tanggal_berakhir langganan mengikuti fitur
+    // "waktu simulasi" demo, bukan waktu server sungguhan.
+    body: JSON.stringify({ pembayaranIds: idList, waktuKlien: ambilWaktuSekarang().toISOString() })
+  });
+
+  const hasil = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(hasil?.error || `Gagal membuat transaksi Midtrans (status ${res.status}).`);
+  }
+  return { token: hasil.token, urlRedirect: hasil.redirect_url };
 }
 
 /**
- * Integrasi Frontend: Menampilkan pop-up pembayaran Snap Midtrans
+ * Integrasi Frontend: Menampilkan pop-up pembayaran Snap Midtrans yang
+ * sungguhan. Status pembayaran TIDAK diubah langsung dari callback ini --
+ * konfirmasi resmi datang dari webhook Midtrans (lihat
+ * supabase/functions/midtrans-webhook/index.ts) yang memperbarui baris
+ * `pembayaran`/`langganan` di database. Callback di sini hanya dipakai
+ * untuk feedback UI (mis. menampilkan status "menunggu konfirmasi").
  */
 export async function bayarDenganMidtrans(
   tokenSnap: string,
   onSukses?: (hasil: any) => void,
   onMenunggu?: (hasil: any) => void,
-  onError?: (err: any) => void
+  onError?: (err: any) => void,
+  onClose?: () => void
 ) {
   const scriptLoaded = await muatScriptSnap();
   if (!scriptLoaded) {
@@ -82,7 +105,6 @@ export async function bayarDenganMidtrans(
     return;
   }
 
-  // Panggil window.snap.pay yang disediakan oleh snap.js
   const snap = (window as any).snap;
   if (!snap) {
     if (onError) onError(new Error('Modul pembayaran Snap tidak ditemukan pada browser.'));
@@ -91,129 +113,145 @@ export async function bayarDenganMidtrans(
 
   snap.pay(tokenSnap, {
     onSuccess: function (result: any) {
-      console.log('Pembayaran Midtrans Sukses:', result);
       if (onSukses) onSukses(result);
     },
     onPending: function (result: any) {
-      console.log('Pembayaran Midtrans Menunggu:', result);
       if (onMenunggu) onMenunggu(result);
     },
     onError: function (result: any) {
-      console.error('Pembayaran Midtrans Error:', result);
       if (onError) onError(result);
     },
     onClose: function () {
-      console.log('Pop-up pembayaran Midtrans ditutup oleh pengguna.');
+      if (onClose) onClose();
     }
   });
 }
 
 /**
- * Verifikasi Hash Signature untuk keamanan Webhook (SHA-512)
- * Kriteria Midtrans: SHA512(order_id + status_code + gross_amount + server_key)
+ * Menunggu webhook Midtrans (Edge Function "midtrans-webhook") mengubah
+ * status SELURUH baris `pembayaran` yang diberikan menjadi 'lunas'/'gagal'
+ * -- konfirmasi resmi TIDAK PERNAH dilakukan langsung dari client, jadi di
+ * sini kita polling status terbaru dari database setiap beberapa detik
+ * sampai semuanya lunas (atau ada satu yang gagal) atau timeout. Dipakai
+ * oleh prosesPembayaranMidtrans() di bawah -- kalau pembayaranIds lebih
+ * dari satu (Pembayaran Gabungan Multi-Anak), webhook menandai semuanya
+ * lunas bersamaan (satu order_id yang sama), tapi tetap di-poll semuanya
+ * untuk jaga-jaga kalau ada race condition kecil antar UPDATE baris.
  */
-export async function verifikasiSignatureMidtrans(
-  idPesanan: string,
-  statusCode: string,
-  jumlahTotal: string,
-  signatureKlien: string
-): Promise<boolean> {
-  // Dalam production, generate SHA-512 menggunakan library crypto NodeJS:
-  // const hash = crypto.createHash('sha512').update(idPesanan + statusCode + jumlahTotal + ServerKey).digest('hex');
-  // return hash === signatureKlien;
+export async function tungguKonfirmasiPembayaran(
+  pembayaranIds: string | string[],
+  timeoutMs = 120000
+): Promise<'lunas' | 'gagal' | 'timeout'> {
+  const client = supabase;
+  if (!client) return 'lunas'; // fallback mock (Supabase tidak dikonfigurasi)
+  const idList = Array.isArray(pembayaranIds) ? pembayaranIds : [pembayaranIds];
 
-  // Mock verifikasi signature di client/simulasi dengan menyertakan semua parameter input
-  console.log('Memverifikasi signature webhook Midtrans...', { 
-    idPesanan, 
-    statusCode, 
-    jumlahTotal, 
-    signatureKlien,
-    kunciServerAktif: kunciServer.substring(0, 6) + '***'
-  });
-  return true;
+  const mulai = Date.now();
+  while (Date.now() - mulai < timeoutMs) {
+    const { data } = await client.from('pembayaran').select('status').in('id', idList);
+    const statusList = (data ?? []).map((d) => d.status);
+    if (statusList.length === idList.length) {
+      if (statusList.some((s) => s === 'gagal')) return 'gagal';
+      if (statusList.every((s) => s === 'lunas')) return 'lunas';
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+  return 'timeout';
 }
 
 /**
- * Handler Webhook Notifikasi Midtrans
- * POST /api/pembayaran/notifikasi
+ * Cek SEKALI (bukan polling) status baris `pembayaran` terkini -- dipakai
+ * tombol "Cek Status Sekarang" setelah prosesPembayaranMidtrans()
+ * mengembalikan 'timeout_setelah_sukses', supaya pengguna bisa memeriksa
+ * ulang tanpa perlu menunggu polling otomatis lagi atau reload halaman.
  */
-export async function prosesNotifikasiMidtrans(dataNotifikasi: {
-  order_id: string;
-  transaction_status: string;
-  status_code: string;
-  gross_amount: string;
-  signature_key: string;
-  payment_type: string;
-}) {
-  const { order_id, transaction_status, status_code, gross_amount, signature_key } = dataNotifikasi;
+export async function cekStatusPembayaran(pembayaranIds: string | string[]): Promise<'lunas' | 'gagal' | 'menunggu'> {
+  const client = supabase;
+  if (!client) return 'lunas';
+  const idList = Array.isArray(pembayaranIds) ? pembayaranIds : [pembayaranIds];
+  const { data } = await client.from('pembayaran').select('status').in('id', idList);
+  const statusList = (data ?? []).map((d) => d.status);
+  if (statusList.length !== idList.length) return 'menunggu';
+  if (statusList.some((s) => s === 'gagal')) return 'gagal';
+  if (statusList.every((s) => s === 'lunas')) return 'lunas';
+  return 'menunggu';
+}
 
-  // 1. Verifikasi Signature Key untuk keamanan
-  const valid = await verifikasiSignatureMidtrans(order_id, status_code, gross_amount, signature_key);
-  if (!valid) {
-    throw new Error('Midtrans Webhook Security Warning: Invalid Signature Key!');
-  }
+/**
+ * Satu kali percobaan alur pembayaran Midtrans untuk SATU ATAU LEBIH baris
+ * `pembayaran` sekaligus (Pembayaran Gabungan Multi-Anak -- kalau
+ * pembayaranIds lebih dari satu, semuanya dilunasi lewat SATU popup Snap
+ * untuk totalnya, bukan satu-satu per anak): buat transaksi baru lalu buka
+ * popup Snap. Kalau pengguna menutup popup (baik sebelum sempat pilih
+ * metode, maupun sesudah pilih metode seperti Alfamart/Indomaret/VA lalu
+ * tidak kunjung membayar), fungsi ini BERHENTI dan mengembalikan 'batal' --
+ * pengguna harus menekan tombol "Bayar Sekarang" lagi untuk membuka popup
+ * baru (tidak otomatis mencoba ulang).
+ *
+ * PENTING soal batasan nyata Snap.js: hanya SATU dari onSuccess/onPending/
+ * onError yang pernah dipanggil per percobaan, dan begitu salah satunya
+ * terpanggil popup langsung menutup diri sendiri -- onClose TIDAK akan
+ * menyusul setelah onPending (sempat salah diasumsikan sebelumnya,
+ * menyebabkan alur macet selamanya di "menunggu konfirmasi" saat pengguna
+ * salah pilih metode). Karena itu, begitu status "pending" diterima, kita
+ * HANYA menunggu konfirmasi lunas dalam jangka pendek (timeoutPendingMs) --
+ * kalau belum lunas juga dalam waktu itu, dianggap "ditinggal" dan
+ * langsung dikembalikan sebagai 'batal' (bukan otomatis dicoba ulang).
+ */
+export async function prosesPembayaranMidtrans(
+  pembayaranIds: string | string[],
+  opsi: {
+    onProgres?: (teks: string) => void;
+    timeoutPendingMs?: number;
+    timeoutSuksesMs?: number;
+  } = {}
+): Promise<'lunas' | 'gagal' | 'batal' | 'timeout_setelah_sukses'> {
+  const idList = Array.isArray(pembayaranIds) ? pembayaranIds : [pembayaranIds];
+  const timeoutPendingMs = opsi.timeoutPendingMs ?? 15000;
+  // SEBELUMNYA 120 detik -- pengguna terpaku pada spinner "Menunggu
+  // konfirmasi pembayaran..." tanpa kepastian sampai 2 menit penuh kalau
+  // webhook Midtrans lambat/tidak terdaftar dengan benar. Dipersingkat jadi
+  // 45 detik supaya tidak terasa macet; kalau memang belum lunas juga
+  // setelah itu, dikembalikan sbg 'timeout_setelah_sukses' (BUKAN 'batal')
+  // -- lihat catatan di bawah kenapa keduanya harus dibedakan.
+  const timeoutSuksesMs = opsi.timeoutSuksesMs ?? 45000;
+  const lapor = (teks: string) => opsi.onProgres?.(teks);
 
-  // 2. Tentukan status pembayaran lokal
-  let statusPembayaranBaru = 'Menunggu';
-  if (transaction_status === 'capture' || transaction_status === 'settlement') {
-    statusPembayaranBaru = 'Lunas';
-  } else if (transaction_status === 'pending') {
-    statusPembayaranBaru = 'Menunggu Pembayaran';
-  } else if (['deny', 'expire', 'cancel'].includes(transaction_status)) {
-    statusPembayaranBaru = 'Gagal';
-  }
+  lapor('Membuka jendela pembayaran...');
+  const { token } = await buatTransaksiMidtrans(idList);
 
-  // 3. Update status pembayaran di database Supabase
-  if (supabase) {
-    const { error: errUpdate } = await supabase
-      .from('pembayaran')
-      .update({ 
-        status: statusPembayaranBaru,
-        metode_pembayaran: dataNotifikasi.payment_type,
-        diperbarui_pada: new Date().toISOString()
-      })
-      .eq('id', order_id);
+  const hasilPopup = await new Promise<'sukses' | 'pending' | 'tutup' | 'error'>((resolve) => {
+    bayarDenganMidtrans(
+      token,
+      () => resolve('sukses'),
+      () => resolve('pending'),
+      () => resolve('error'),
+      () => resolve('tutup')
+    );
+  });
 
-    if (errUpdate) {
-      console.error('Gagal memperbarui status tabel pembayaran di Supabase:', errUpdate.message);
-      return { status: 'error', pesan: errUpdate.message };
-    }
+  if (hasilPopup === 'error') return 'gagal';
+  if (hasilPopup === 'tutup') return 'batal';
 
-    // 4. Kirim notifikasi realtime ke pengguna (tabel notifikasi)
-    // Ambil data pembayaran untuk mengetahui orang_tua_id
-    const { data: dataBayar } = await supabase
-      .from('pembayaran')
-      .select('langganan_id')
-      .eq('id', order_id)
-      .single();
+  lapor(
+    hasilPopup === 'pending'
+      ? 'Menunggu penyelesaian pembayaran...'
+      : 'Menunggu konfirmasi pembayaran...'
+  );
+  const status = await tungguKonfirmasiPembayaran(
+    idList,
+    hasilPopup === 'pending' ? timeoutPendingMs : timeoutSuksesMs
+  );
+  if (status === 'lunas') return 'lunas';
+  if (status === 'gagal') return 'gagal';
 
-    if (dataBayar) {
-      const { data: dataLangganan } = await supabase
-        .from('langganan')
-        .select('anak_id')
-        .eq('id', dataBayar.langganan_id)
-        .single();
-
-      if (dataLangganan) {
-        const { data: dataAnak } = await supabase
-          .from('anak')
-          .select('orang_tua_id')
-          .eq('id', dataLangganan.anak_id)
-          .single();
-
-        if (dataAnak) {
-          await supabase.from('notifikasi').insert({
-            pengguna_id: dataAnak.orang_tua_id,
-            judul: 'Konfirmasi Pembayaran',
-            pesan: `Pembayaran tagihan Anda dengan kode transaksi ${order_id} berstatus ${statusPembayaranBaru.toUpperCase()}`,
-            dibaca: false
-          });
-        }
-      }
-    }
-  } else {
-    console.log('Simulasi Database Update: Mengubah status pembayaran', order_id, 'menjadi', statusPembayaranBaru);
-  }
-
-  return { status: 'sukses', status_pembayaran: statusPembayaranBaru };
+  // Timeout: Midtrans SENDIRI sudah bilang 'sukses' (Snap onSuccess benar-
+  // benar terpanggil) -- webhook kita yang belum sempat mengonfirmasi ke
+  // database dalam batas waktu di atas, BUKAN pembayarannya yang gagal/
+  // dibatalkan. Membedakan ini dari 'batal' (ditinggal/ditutup sebelum
+  // sempat bayar) penting supaya pemanggil TIDAK menyuruh pengguna
+  // "Bayar Sekarang" lagi -- itu bisa berarti membayar dua kali padahal
+  // pembayaran pertama kemungkinan besar sudah berhasil.
+  if (hasilPopup === 'sukses') return 'timeout_setelah_sukses';
+  return 'batal'; // hasilPopup === 'pending' & timeout -> anggap ditinggal, minta pengguna coba lagi manual
 }

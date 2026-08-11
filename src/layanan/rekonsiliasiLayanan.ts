@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { kirimNotifikasi } from './notifikasiLayanan';
 
 interface PembayaranLokal {
   id: string;
@@ -103,11 +104,16 @@ export async function rekonsiliasiPembayaran(): Promise<{
               .single();
 
             if (dataAnak) {
-              await supabase.from('notifikasi').insert({
-                pengguna_id: dataAnak.orang_tua_id,
+              // WAJIB lewat kirimNotifikasi() (RPC SECURITY DEFINER), bukan
+              // insert langsung -- tabel notifikasi tidak punya kebijakan
+              // RLS INSERT untuk peran non-admin, insert langsung selalu
+              // ditolak. `tipe` juga NOT NULL (sebelumnya tidak disertakan
+              // sama sekali di sini, jadi insert akan selalu gagal).
+              await kirimNotifikasi({
+                penggunaId: dataAnak.orang_tua_id,
                 judul: 'Rekonsiliasi Billing',
                 pesan: `Transaksi Anda dengan kode ${bayar.id} disinkronkan otomatis menjadi: ${statusTerbaru.toUpperCase()}`,
-                dibaca: false
+                tipe: 'pembayaran'
               });
             }
           }

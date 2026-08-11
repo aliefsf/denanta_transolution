@@ -1,7 +1,24 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Bell, CheckCheck, Eye, EyeOff, Info, Clock } from 'lucide-vue-next';
+import { computed, onMounted, ref } from 'vue';
+import { CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-vue-next';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
+import MemuatUtama from '../umum/MemuatUtama.vue';
+import ModalUtama from '../umum/ModalUtama.vue';
+import { useDataOrangTua } from '../../komposabel/useDataOrangTua';
+import { formatWaktuRelatif } from '../../bantuan/formatWaktuRelatif';
+import { tandaiNotifikasiDibaca, tandaiSemuaNotifikasiDibaca } from '../../layanan/notifikasiLayanan';
+import { infoTampilanNotifikasi } from '../../bantuan/notifikasiTampilan';
+
+const {
+  notifikasiList,
+  sedangMemuat,
+  error,
+  sudahDimuat,
+  orangTuaId,
+  muatNotifikasi,
+  hapusSatuNotifikasi,
+  hapusSemuaNotifikasiPengguna
+} = useDataOrangTua();
 
 // Toast Alert
 const toastTampil = ref(false);
@@ -14,87 +31,148 @@ const picuToast = (pesan: string, tipe: 'sukses' | 'error' | 'info' = 'info') =>
   toastTampil.value = true;
 };
 
+onMounted(() => {
+  if (!sudahDimuat.value) muatNotifikasi();
+});
+
 // State Kategori
 const kategoriTerpilih = ref('semua');
 
-// Mock Data Notifikasi
-const daftarNotif = ref([
-  { id: 'n-1', kategori: 'perjalanan', pesan: 'Aisyah Putri telah naik ke bus sekolah bersama Supir Budi.', waktu: '06:15 WIB', dibaca: false, detail: 'Armada B-102 dikendarai supir Budi meluncur dari Jl. Prof. M. Yamin menuju SD N 01 Padang dengan aman.' },
-  { id: 'n-2', kategori: 'pembayaran', pesan: 'Pembayaran langganan bulan Juli jatuh tempo pada tanggal 7.', waktu: '08:00 WIB', dibaca: false, detail: 'Pembayaran dapat diselesaikan instant lewat portal online Midtrans Snap.' },
-  { id: 'n-3', kategori: 'sistem', pesan: 'Armada Bus B-102 selesai melewati servis bulanan rutin.', waktu: 'Kemarin', dibaca: true, detail: 'Pemeriksaan ban, rem, dan aki selesai dilakukan di bengkel resmi.' },
-  { id: 'n-4', kategori: 'perjalanan', pesan: 'Aisyah Putri telah sampai di sekolah dengan selamat.', waktu: 'Kemarin', dibaca: true, detail: 'Siswa masuk sekolah pada pukul 06:40 WIB.' }
-]);
+const daftarNotif = computed(() =>
+  notifikasiList.value.map((n) => ({
+    id: n.id,
+    kategori: n.tipe,
+    pesan: n.judul,
+    detail: n.pesan,
+    waktu: formatWaktuRelatif(n.dibuat_pada),
+    dibaca: n.sudah_dibaca,
+    tampilan: infoTampilanNotifikasi(n.tipe, n.tipe_terkait)
+  }))
+);
 
 const filteredNotif = computed(() => {
   if (kategoriTerpilih.value === 'semua') return daftarNotif.value;
-  return daftarNotif.value.filter(n => n.kategori === kategoriTerpilih.value);
+  return daftarNotif.value.filter((n) => n.kategori === kategoriTerpilih.value);
 });
 
-const tandaiSemuaDibaca = () => {
-  daftarNotif.value.forEach(n => n.dibaca = true);
-  picuToast('Semua notifikasi ditandai sebagai dibaca!', 'sukses');
+const tandaiSemuaDibaca = async () => {
+  if (!orangTuaId.value) return;
+  try {
+    await tandaiSemuaNotifikasiDibaca(orangTuaId.value);
+    notifikasiList.value.forEach((n) => (n.sudah_dibaca = true));
+    picuToast('Semua notifikasi ditandai sebagai dibaca!', 'sukses');
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal menandai notifikasi.', 'error');
+  }
 };
 
-const toggleBaca = (id: string) => {
-  const item = daftarNotif.value.find(n => n.id === id);
-  if (item) {
-    item.dibaca = !item.dibaca;
+const toggleBaca = async (id: string) => {
+  const item = notifikasiList.value.find((n) => n.id === id);
+  if (!item) return;
+  const statusBaru = !item.sudah_dibaca;
+  try {
+    if (statusBaru) {
+      await tandaiNotifikasiDibaca(id);
+    }
+    item.sudah_dibaca = statusBaru;
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal memperbarui status notifikasi.', 'error');
+  }
+};
+
+const hapusSatuNotif = async (id: string) => {
+  try {
+    await hapusSatuNotifikasi(id);
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal menghapus notifikasi.', 'error');
+  }
+};
+
+const modalBersihkanTampil = ref(false);
+const sedangMembersihkan = ref(false);
+
+const konfirmasiBersihkanSemua = async () => {
+  sedangMembersihkan.value = true;
+  try {
+    await hapusSemuaNotifikasiPengguna();
+    picuToast('Semua notifikasi berhasil dihapus!', 'sukses');
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal membersihkan notifikasi.', 'error');
+  } finally {
+    sedangMembersihkan.value = false;
+    modalBersihkanTampil.value = false;
   }
 };
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6 relative min-h-[200px]">
+    <MemuatUtama tema="terang" :tampil="sedangMemuat" pesan="Memuat notifikasi..." />
+
     <!-- Toast Alert -->
-    <NotifikasiUtama 
-      :tampil="toastTampil" 
-      :pesan="toastPesan" 
-      :tipe="toastTipe" 
-      @tutup="toastTampil = false" 
+    <NotifikasiUtama
+      :tampil="toastTampil"
+      :pesan="toastPesan"
+      :tipe="toastTipe"
+      @tutup="toastTampil = false"
     />
 
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 class="text-xl font-bold text-white uppercase tracking-wider">Kotak Masuk Notifikasi</h1>
-        <p class="text-xs text-slate-400">Pemberitahuan aktivitas pelacakan anak, pembayaran, dan informasi sistem.</p>
+        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Kotak Masuk Notifikasi</h1>
+        <p class="text-xs text-on-surface-variant">Pemberitahuan aktivitas pelacakan anak, pembayaran, dan informasi sistem.</p>
       </div>
-      
-      <button 
-        @click="tandaiSemuaDibaca"
-        class="text-xs font-bold text-warnaTombol hover:underline flex items-center gap-1.5 cursor-pointer bg-warnaSekunder/40 px-3.5 py-2 rounded-xl border border-warnaAksen/20"
-      >
-        <CheckCheck class="w-4 h-4" />
-        Tandai Semua Dibaca
-      </button>
+
+      <div class="flex items-center gap-2">
+        <button
+          @click="tandaiSemuaDibaca"
+          class="text-xs font-bold text-primary hover:underline flex items-center gap-1.5 cursor-pointer bg-surface-container-lowest px-3.5 py-2 rounded-xl border border-outline-variant/30"
+        >
+          <CheckCheck class="w-4 h-4" />
+          Tandai Semua Dibaca
+        </button>
+        <button
+          v-if="notifikasiList.length > 0"
+          @click="modalBersihkanTampil = true"
+          class="text-xs font-bold text-rose-600 hover:underline flex items-center gap-1.5 cursor-pointer bg-surface-container-lowest px-3.5 py-2 rounded-xl border border-outline-variant/30"
+        >
+          <Trash2 class="w-4 h-4" />
+          Bersihkan Semua
+        </button>
+      </div>
+    </div>
+
+    <div v-if="error" class="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-4 py-3 rounded-xl">
+      {{ error }}
     </div>
 
     <!-- Category Tabs -->
-    <div class="flex border-b border-warnaAksen/20 text-xs">
-      <button 
+    <div class="flex border-b border-outline-variant/20 text-xs">
+      <button
         @click="kategoriTerpilih = 'semua'"
         class="py-2.5 px-4 font-semibold border-b-2 cursor-pointer transition-all"
-        :class="kategoriTerpilih === 'semua' ? 'border-warnaTombol text-white' : 'border-transparent text-slate-400 hover:text-slate-200'"
+        :class="kategoriTerpilih === 'semua' ? 'border-primary text-on-surface' : 'border-transparent text-on-surface-variant hover:text-on-surface'"
       >
         Semua
       </button>
-      <button 
+      <button
         @click="kategoriTerpilih = 'perjalanan'"
         class="py-2.5 px-4 font-semibold border-b-2 cursor-pointer transition-all"
-        :class="kategoriTerpilih === 'perjalanan' ? 'border-warnaTombol text-white' : 'border-transparent text-slate-400 hover:text-slate-200'"
+        :class="kategoriTerpilih === 'perjalanan' ? 'border-primary text-on-surface' : 'border-transparent text-on-surface-variant hover:text-on-surface'"
       >
         Perjalanan
       </button>
-      <button 
+      <button
         @click="kategoriTerpilih = 'pembayaran'"
         class="py-2.5 px-4 font-semibold border-b-2 cursor-pointer transition-all"
-        :class="kategoriTerpilih === 'pembayaran' ? 'border-warnaTombol text-white' : 'border-transparent text-slate-400 hover:text-slate-200'"
+        :class="kategoriTerpilih === 'pembayaran' ? 'border-primary text-on-surface' : 'border-transparent text-on-surface-variant hover:text-on-surface'"
       >
         Pembayaran
       </button>
-      <button 
+      <button
         @click="kategoriTerpilih = 'sistem'"
         class="py-2.5 px-4 font-semibold border-b-2 cursor-pointer transition-all"
-        :class="kategoriTerpilih === 'sistem' ? 'border-warnaTombol text-white' : 'border-transparent text-slate-400 hover:text-slate-200'"
+        :class="kategoriTerpilih === 'sistem' ? 'border-primary text-on-surface' : 'border-transparent text-on-surface-variant hover:text-on-surface'"
       >
         Sistem
       </button>
@@ -102,55 +180,98 @@ const toggleBaca = (id: string) => {
 
     <!-- Notifications List -->
     <div class="space-y-3">
-      <div 
-        v-for="notif in filteredNotif" 
+      <div
+        v-for="notif in filteredNotif"
         :key="notif.id"
         class="p-4 rounded-xl border transition-all flex items-start gap-4 relative overflow-hidden"
         :class="[
-          notif.dibaca ? 'bg-warnaSekunder/40 border-warnaAksen/10' : 'bg-warnaSekunder border-warnaAksen/30 shadow-md'
+          notif.dibaca ? 'bg-surface-container/40 border-outline-variant/10' : 'bg-surface-container-lowest border-outline-variant/30 soft-shadow'
         ]"
       >
-        <!-- Unread Blue Dot -->
-        <span v-if="!notif.dibaca" class="absolute left-0 top-0 bottom-0 w-1 bg-warnaTombol"></span>
+        <!-- Unread Dot -->
+        <span v-if="!notif.dibaca" class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></span>
 
-        <!-- Icon Category -->
-        <div 
-          class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-          :class="{
-            'bg-warnaTombol/10 text-warnaTombol': notif.kategori === 'perjalanan',
-            'bg-amber-500/10 text-amber-400': notif.kategori === 'pembayaran',
-            'bg-blue-500/10 text-blue-400': notif.kategori === 'sistem'
-          }"
+        <!-- Icon -- per KEJADIAN SPESIFIK (mis. status perjalanan/penundaan
+             disetujui-ditolak), bukan cuma kategori umum, supaya info paling
+             penting langsung terlihat lewat warna & ikon yang berbeda. -->
+        <div
+          class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          :class="notif.tampilan.kelasIkon"
         >
-          <Bell v-if="notif.kategori === 'perjalanan'" class="w-4 h-4" />
-          <Clock v-else-if="notif.kategori === 'pembayaran'" class="w-4 h-4" />
-          <Info v-else class="w-4 h-4" />
+          <component :is="notif.tampilan.ikon" class="w-4.5 h-4.5" />
         </div>
 
         <!-- Content -->
         <div class="flex-grow space-y-1.5">
           <div class="flex justify-between items-center text-[10px]">
-            <span class="font-bold uppercase tracking-wider text-slate-400">{{ notif.kategori }}</span>
-            <span class="text-slate-500 font-mono">{{ notif.waktu }}</span>
+            <span class="font-bold uppercase tracking-wider text-on-surface-variant">{{ notif.kategori }}</span>
+            <span class="text-on-surface-variant font-mono">{{ notif.waktu }}</span>
           </div>
-          <p class="text-xs font-semibold text-white leading-relaxed">{{ notif.pesan }}</p>
-          <p class="text-[11px] text-slate-400 leading-relaxed">{{ notif.detail }}</p>
+          <!-- Judul = info paling penting, dibuat menonjol (lebih besar &
+               tebal) dibanding isi pesan yang sifatnya penjelasan tambahan. -->
+          <p class="text-sm font-bold text-on-surface leading-snug">{{ notif.pesan }}</p>
+          <p class="text-[11px] text-on-surface-variant leading-relaxed">{{ notif.detail }}</p>
         </div>
 
-        <!-- Action read/unread -->
-        <button 
-          @click="toggleBaca(notif.id)"
-          class="text-slate-500 hover:text-white p-1 rounded transition-colors cursor-pointer"
-          :title="notif.dibaca ? 'Tandai belum dibaca' : 'Tandai sudah dibaca'"
-        >
-          <Eye v-if="notif.dibaca" class="w-4 h-4" />
-          <EyeOff v-else class="w-4 h-4" />
-        </button>
+        <!-- Action read/unread + hapus -->
+        <div class="flex items-center gap-0.5 flex-shrink-0">
+          <button
+            @click="toggleBaca(notif.id)"
+            class="text-on-surface-variant hover:text-on-surface p-1 rounded transition-colors cursor-pointer"
+            :title="notif.dibaca ? 'Tandai belum dibaca' : 'Tandai sudah dibaca'"
+          >
+            <Eye v-if="notif.dibaca" class="w-4 h-4" />
+            <EyeOff v-else class="w-4 h-4" />
+          </button>
+          <button
+            @click="hapusSatuNotif(notif.id)"
+            class="text-on-surface-variant hover:text-rose-600 p-1 rounded transition-colors cursor-pointer"
+            title="Hapus notifikasi"
+          >
+            <Trash2 class="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      <div v-if="filteredNotif.length === 0" class="text-center py-8 text-slate-500 italic text-xs">
+      <div v-if="!sedangMemuat && filteredNotif.length === 0" class="text-center py-8 text-on-surface-variant italic text-xs">
         Tidak ada pemberitahuan di kategori ini.
       </div>
     </div>
+
+    <!-- Modal Konfirmasi Bersihkan Semua -->
+    <ModalUtama
+      tema="terang"
+      :tampil="modalBersihkanTampil"
+      judul="Bersihkan Semua Notifikasi"
+      ukuran="sedang"
+      @tutup="modalBersihkanTampil = false"
+    >
+      <div class="space-y-3 text-center py-3">
+        <div class="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 mx-auto mb-2">
+          <Trash2 class="w-6 h-6" />
+        </div>
+        <h3 class="text-base font-bold text-on-surface">Hapus seluruh notifikasi?</h3>
+        <p class="text-xs text-on-surface-variant leading-relaxed">Semua notifikasi di kotak masuk ini akan dihapus permanen dan tidak bisa dikembalikan.</p>
+      </div>
+
+      <template #footer>
+        <button
+          type="button"
+          class="px-5 py-2.5 rounded-full text-on-surface-variant font-semibold hover:text-on-surface transition-colors bg-transparent border-0 cursor-pointer text-sm"
+          :disabled="sedangMembersihkan"
+          @click="modalBersihkanTampil = false"
+        >
+          Batal
+        </button>
+        <button
+          type="button"
+          class="px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-colors border-0 cursor-pointer text-sm disabled:opacity-60"
+          :disabled="sedangMembersihkan"
+          @click="konfirmasiBersihkanSemua"
+        >
+          {{ sedangMembersihkan ? 'Menghapus...' : 'Ya, Hapus Semua' }}
+        </button>
+      </template>
+    </ModalUtama>
   </div>
 </template>

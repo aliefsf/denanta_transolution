@@ -28,3 +28,18 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Dokumen skripsi & referensi (bukan bagian dari aplikasi web)
+*.docx
+*.docx.bak*
+~$*.docx
+*.pdf
+*_extract.png
+*_dump.txt
+Arsitektur/
+ERD/
+Flowchart/
+Sequence Diagram/
+Wireframe/
+Alur Sistem yang Diusulkan.txt
+~WRL*.tmp

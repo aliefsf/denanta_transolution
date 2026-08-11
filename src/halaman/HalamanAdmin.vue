@@ -8,13 +8,13 @@ import PenugasanAdmin from '../komponen/admin/PenugasanAdmin.vue';
 import DataAnakAdmin from '../komponen/admin/DataAnakAdmin.vue';
 import DataSekolahAdmin from '../komponen/admin/DataSekolahAdmin.vue';
 import LaporanAdmin from '../komponen/admin/LaporanAdmin.vue';
-import KeuanganAdmin from '../komponen/admin/KeuanganAdmin.vue';
 import DaftarPenggunaAdmin from '../komponen/admin/DaftarPenggunaAdmin.vue';
-import PengumumanAdmin from '../komponen/admin/PengumumanAdmin.vue';
-import LogAktivitasAdmin from '../komponen/admin/LogAktivitasAdmin.vue';
 import PengaturanAdmin from '../komponen/admin/PengaturanAdmin.vue';
+import KelolaJadwalAdmin from '../komponen/admin/KelolaJadwalAdmin.vue';
+import NotifikasiAdmin from '../komponen/admin/NotifikasiAdmin.vue';
 
-// Tab Aktif: dashboard, pemantauan, supir, penugasan, anak, sekolah, laporan, keuangan, pengguna, pengumuman, log, pengaturan
+// Tab Aktif: dashboard, pemantauan, supir, penugasan, anak, sekolah, laporan, pengguna, tarif, jadwal
+// (mengikuti skenario use case Admin UC-A01 s.d. UC-A09)
 const tabAktif = ref<'dashboard' | string>('dashboard');
 </script>
 
@@ -39,23 +39,20 @@ const tabAktif = ref<'dashboard' | string>('dashboard');
     <DataSekolahAdmin 
       v-else-if="tabAktif === 'sekolah'" 
     />
-    <LaporanAdmin 
-      v-else-if="tabAktif === 'laporan'" 
+    <LaporanAdmin
+      v-else-if="tabAktif === 'laporan'"
     />
-    <KeuanganAdmin 
-      v-else-if="tabAktif === 'keuangan'" 
+    <DaftarPenggunaAdmin
+      v-else-if="tabAktif === 'pengguna'"
     />
-    <DaftarPenggunaAdmin 
-      v-else-if="tabAktif === 'pengguna'" 
+    <PengaturanAdmin
+      v-else-if="tabAktif === 'tarif'"
     />
-    <PengumumanAdmin 
-      v-else-if="tabAktif === 'pengumuman'" 
+    <KelolaJadwalAdmin
+      v-else-if="tabAktif === 'jadwal'"
     />
-    <LogAktivitasAdmin 
-      v-else-if="tabAktif === 'log'" 
-    />
-    <PengaturanAdmin 
-      v-else-if="tabAktif === 'pengaturan'" 
+    <NotifikasiAdmin
+      v-else-if="tabAktif === 'notifikasi'"
     />
   </TataLetakAdmin>
 </template>

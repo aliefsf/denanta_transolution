@@ -5,12 +5,16 @@ interface Props {
   tampil: boolean;
   pesan?: string;
   penuhLayar?: boolean;
+  // 'gelap' dipakai halaman dengan tema lama, 'terang' dipakai halaman
+  // dengan palet Material terang (Admin, Supir, Orang Tua, dst).
+  tema?: 'gelap' | 'terang';
 }
 
 withDefaults(defineProps<Props>(), {
   tampil: false,
   pesan: 'Memuat data...',
   penuhLayar: false,
+  tema: 'gelap',
 });
 </script>
 
@@ -26,13 +30,14 @@ withDefaults(defineProps<Props>(), {
     <div
       v-if="tampil"
       :class="[
-        penuhLayar ? 'fixed inset-0 z-50 bg-black/75 backdrop-blur-md' : 'absolute inset-0 z-10 bg-warnaUtama/70 backdrop-blur-xs',
+        penuhLayar ? 'fixed inset-0 z-50 backdrop-blur-md' : 'absolute inset-0 z-10 backdrop-blur-xs',
+        penuhLayar ? (tema === 'terang' ? 'bg-white/75' : 'bg-black/75') : (tema === 'terang' ? 'bg-background/70' : 'bg-warnaUtama/70'),
         'flex items-center justify-center p-4'
       ]"
     >
       <div class="text-center space-y-3">
-        <Loader2 class="w-10 h-10 text-warnaTombol animate-spin mx-auto" />
-        <p class="text-sm font-semibold text-white tracking-wide">{{ pesan }}</p>
+        <Loader2 class="w-10 h-10 animate-spin mx-auto" :class="tema === 'terang' ? 'text-primary' : 'text-warnaTombol'" />
+        <p class="text-sm font-semibold tracking-wide" :class="tema === 'terang' ? 'text-on-surface' : 'text-white'">{{ pesan }}</p>
       </div>
     </div>
   </Transition>

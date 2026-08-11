@@ -1,18 +1,72 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../penyimpanan/authStore';
-import { 
-  Bus, Menu, X, Bell, User,
+import { useAuth } from '../komposabel/useAuth';
+import FooterPublik from '../komponen/umum/FooterPublik.vue';
+import { ambilPengaturanTarif, type PengaturanTarifRow } from '../layanan/tarifLayanan';
+import { formatMataUang } from '../bantuan/formatMataUang';
+import { kelasMenuNavbar, kelasMenuNavbarMobile } from '../bantuan/kelasMenuNavbar';
+import {
+  Menu, X, Bell, User,
   ShieldCheck, MapPin, Clock, Check,
-  HelpCircle, ChevronDown, Phone, Mail, Send, Loader2, CheckCircle,
-  Instagram, Facebook, Share
+  HelpCircle, ChevronDown
 } from 'lucide-vue-next';
 
 const router = useRouter();
+const route = useRoute();
 const authStore = useAuthStore();
+const { isAuthenticated, userProfile } = useAuth();
 const menuTerbuka = ref(false);
 const adaNotifikasi = ref(true);
+
+// Efek "pill" aktif pada menu navbar mengikuti rute yang sedang dibuka --
+// dinamis lewat useRoute() (bukan ditulis statis per halaman) supaya kalau
+// suatu saat menu ini ditambah/route berubah, status aktifnya tidak perlu
+// disetel manual satu-satu dan otomatis benar begitu pengguna berpindah
+// halaman.
+const kelasMenuBeranda = computed(() => kelasMenuNavbar(route.path === '/'));
+const kelasMenuTentang = computed(() => kelasMenuNavbar(route.path === '/tentang'));
+const kelasMenuLangganan = computed(() => kelasMenuNavbar(route.path === '/berlangganan'));
+const kelasMenuBerandaMobile = computed(() => kelasMenuNavbarMobile(route.path === '/'));
+const kelasMenuTentangMobile = computed(() => kelasMenuNavbarMobile(route.path === '/tentang'));
+const kelasMenuLangganganMobile = computed(() => kelasMenuNavbarMobile(route.path === '/berlangganan'));
+
+// Kartu harga "Estimasi Biaya" di landing page -- SEBELUMNYA angka statis
+// tertulis langsung di teks ("Rp 475.000"/"Rp 275.000"), tidak ikut berubah
+// kalau Admin mengubah tarif lewat Kelola Tarif. Sekarang dibaca live dari
+// pengaturan_tarif (sama seperti KalkulatorBiaya.vue/wizard berlangganan)
+// supaya harga yang ditampilkan ke calon pelanggan selalu sesuai konfigurasi
+// terbaru. Fallback ke nilai default lama bila gagal dimuat (mis. offline).
+const tarifPublik = ref<PengaturanTarifRow | null>(null);
+const hargaAntarJemput = computed(() => formatMataUang(tarifPublik.value?.tarif_antar_jemput ?? 475000));
+const hargaAntarSaja = computed(() => formatMataUang(tarifPublik.value?.tarif_antar_saja ?? 275000));
+
+onMounted(async () => {
+  try {
+    tarifPublik.value = await ambilPengaturanTarif();
+  } catch {
+    // Biarkan tampil harga default (fallback di atas) bila gagal dimuat
+  }
+});
+
+// Carousel gambar Hero -- bergantian tiap 10 detik dengan transisi fade
+// (lihat <Transition name="fade-hero"> di template). File disalin ke
+// public/aset/ (nama file tanpa spasi) supaya bisa diakses langsung sebagai
+// URL statis oleh Vite, tanpa perlu di-import satu-satu.
+const gambarHero = ['/aset/gambar-1.png', '/aset/gambar-2.png', '/aset/gambar-3.png', '/aset/gambar-4.png'];
+const indeksGambarHero = ref(0);
+let timerGambarHero: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  timerGambarHero = setInterval(() => {
+    indeksGambarHero.value = (indeksGambarHero.value + 1) % gambarHero.length;
+  }, 10000);
+});
+
+onUnmounted(() => {
+  if (timerGambarHero) clearInterval(timerGambarHero);
+});
 
 const toggleMenu = () => {
   menuTerbuka.value = !menuTerbuka.value;
@@ -31,12 +85,34 @@ const navigasiDashboard = () => {
   menuTerbuka.value = false;
 };
 
-const profilePath = computed(() => {
-  if (authStore.apakahAdmin) return { path: '/admin', query: { tab: 'profil' } };
-  if (authStore.apakahSupir) return { path: '/supir', query: { tab: 'profil' } };
-  if (authStore.apakahOrangTua) return { path: '/orangtua', query: { tab: 'profil' } };
-  return { path: '/' };
-});
+// Ikon lonceng notifikasi navbar publik -- arahkan ke tab "Notifikasi" di
+// dashboard sesuai peran pengguna yang sedang login (bukan halaman
+// tersendiri, notifikasi memang cuma ada sebagai tab di masing-masing
+// panel dashboard, lihat TataLetakOrangTua.vue/TataLetakSupir.vue/
+// TataLetakAdmin.vue).
+const bukaNotifikasi = () => {
+  if (authStore.apakahAdmin) router.push({ path: '/admin', query: { tab: 'notifikasi' } });
+  else if (authStore.apakahSupir) router.push({ path: '/supir', query: { tab: 'notifikasi' } });
+  else if (authStore.apakahOrangTua) router.push({ path: '/orangtua', query: { tab: 'notifikasi' } });
+  menuTerbuka.value = false;
+};
+
+// Menu "Berlangganan"/"Monitoring": label & tujuan mengikuti status
+// langganan -- belum berlangganan -> "Berlangganan" (ke halaman pendaftaran),
+// sudah berlangganan -> "Monitoring" (ke Dashboard/tab default Panel
+// Pengguna, BUKAN langsung ke tab Pantau Anak -- pengguna sendiri yang
+// memilih fitur monitoring dari dashboard).
+const sudahAktifBerlangganan = computed(() => authStore.sudahLogin && authStore.sudahBerlangganan);
+const labelMenuLangganan = computed(() => (sudahAktifBerlangganan.value ? 'Monitoring' : 'Berlangganan'));
+
+const bukaMenuLangganan = () => {
+  if (sudahAktifBerlangganan.value) {
+    router.push('/orangtua');
+  } else {
+    router.push('/berlangganan');
+  }
+  menuTerbuka.value = false;
+};
 
 // Data FAQ Accordion
 const faqList = ref([
@@ -57,7 +133,7 @@ const faqList = ref([
   },
   {
     tanya: 'Bagaimana keamanan data dan privasi anak saya dijamin?',
-    jawab: 'Kami menerapkan kebijakan Row-Level Security (RLS) di database PostgreSQL Supabase. Data posisi dan identitas anak Anda hanya bisa diakses oleh Anda, supir yang ditugaskan, dan administrator resmi.',
+    jawab: 'Data posisi dan identitas anak Anda dijaga ketat dan hanya bisa diakses oleh Anda, supir yang ditugaskan, dan administrator resmi -- tidak pernah dibagikan ke pihak lain.',
     terbuka: false
   },
   {
@@ -76,149 +152,175 @@ const toggleFaq = (index: number) => {
   faqList.value[index].terbuka = !faqList.value[index].terbuka;
 };
 
-// Form Kontak
-const namaForm = ref('');
-const emailForm = ref('');
-const pesanForm = ref('');
-const sedangMengirim = ref(false);
-const berhasilKirim = ref(false);
-
-const tanganiKirimPesan = () => {
-  if (!namaForm.value || !emailForm.value || !pesanForm.value) return;
-  sedangMengirim.value = true;
-  
-  setTimeout(() => {
-    sedangMengirim.value = false;
-    berhasilKirim.value = true;
-    namaForm.value = '';
-    emailForm.value = '';
-    pesanForm.value = '';
-    
-    setTimeout(() => {
-      berhasilKirim.value = false;
-    }, 5000);
-  }, 1200);
-};
+const namaPengguna = computed(() => {
+  return userProfile.value?.nama || 
+         authStore.pengguna?.user_metadata?.nama_lengkap || 
+         authStore.pengguna?.nama_lengkap || 
+         authStore.pengguna?.email?.split('@')[0] || 
+         'Pengguna';
+});
 </script>
 
 <template>
-  <div class="bg-background text-on-background font-body-md relative overflow-x-hidden min-h-screen pt-20">
+  <div class="bg-background text-on-background font-body-md relative overflow-x-hidden min-h-screen pt-24">
     
     <!-- TopNavBar -->
     <nav class="bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant/30 shadow-sm fixed top-0 left-0 w-full z-50">
-      <div class="flex justify-between items-center px-margin-desktop py-4 max-w-[1280px] mx-auto">
+      <div class="flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-[1280px] mx-auto">
         <!-- Logo -->
-        <div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed flex items-center cursor-pointer" @click="navigasiKe('/')">
-          <Bus class="h-7 w-7 text-primary mr-2 animate-pulse" />
-          <span>Denanta<span class="text-[#0D7A68]">TS</span></span>
+        <div class="flex items-center cursor-pointer" @click="navigasiKe('/')">
+          <img src="/logo-denanta.png" alt="Denanta TranSolution" class="h-14 md:h-24 w-auto" />
         </div>
         
         <!-- Desktop Menu -->
-        <div class="hidden md:flex gap-6 items-center">
-          <a @click="navigasiKe('/')" class="text-primary font-semibold border-b-2 border-primary pb-1 font-body-md text-body-md cursor-pointer">Beranda</a>
-          <router-link to="/tentang" class="text-on-surface-variant font-medium font-body-md text-body-md hover:text-primary transition-colors duration-200 cursor-pointer">Tentang Kami</router-link>
-          <router-link to="/berlangganan" class="text-on-surface-variant font-medium font-body-md text-body-md hover:text-primary transition-colors duration-200 cursor-pointer">Berlangganan</router-link>
+        <div class="hidden md:flex gap-2 items-center">
+          <a @click="navigasiKe('/')" :class="kelasMenuBeranda">Beranda</a>
+          <router-link to="/tentang" :class="kelasMenuTentang">Tentang Kami</router-link>
+          <button type="button" @click="bukaMenuLangganan" :class="[kelasMenuLangganan, 'border-0', route.path === '/berlangganan' ? '' : 'bg-transparent']">
+            {{ labelMenuLangganan }}
+          </button>
         </div>
 
         <!-- Right Actions -->
         <div class="hidden md:flex items-center gap-4">
-          <div v-if="authStore.sudahLogin" class="flex items-center gap-3">
-            <!-- Notifikasi -->
-            <div class="relative cursor-pointer text-slate-500 hover:text-primary transition-colors mr-2">
-              <Bell class="w-5 h-5" />
-              <span v-if="adaNotifikasi" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-error"></span>
-            </div>
-            <!-- Profile Link -->
-            <router-link
-              :to="profilePath"
-              class="p-2 rounded-full bg-brand-tosca-light hover:bg-[#D5F0EB] text-primary transition-colors flex items-center justify-center cursor-pointer"
-              title="Edit Profil"
-            >
-              <User class="w-5 h-5" />
-            </router-link>
-            <!-- Dashboard Button -->
-            <button 
-              @click="navigasiDashboard" 
-              class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-full px-5 py-2.5 transition-colors shadow-sm cursor-pointer border-0"
-            >
-              Dashboard
-            </button>
-          </div>
-          <div v-else class="flex items-center gap-4">
-            <router-link to="/login" class="text-on-surface-variant font-semibold hover:text-primary text-sm transition-colors">
-              Masuk
-            </router-link>
+          <!-- Notifikasi -- hanya untuk akun yang SEDANG AKTIF berlangganan,
+               bukan sekadar sudah login (akun yang belum/tidak lagi
+               berlangganan tidak punya dashboard untuk dituju maupun apa
+               pun untuk dinotifikasikan). -->
+          <button
+            v-if="sudahAktifBerlangganan"
+            type="button"
+            @click="bukaNotifikasi"
+            class="relative cursor-pointer text-slate-500 hover:text-primary transition-colors mr-2 p-0 bg-transparent border-0"
+            title="Lihat Notifikasi"
+          >
+            <Bell class="w-5 h-5" />
+            <span v-if="adaNotifikasi" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-error"></span>
+          </button>
+
+          <!-- Kondisi BELUM LOGIN -->
+          <div v-if="!isAuthenticated" class="flex items-center">
             <router-link 
-              to="/daftar" 
-              class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-full px-5 py-2.5 transition-colors shadow-sm cursor-pointer"
+              to="/register" 
+              class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-full px-5 py-2.5 transition-colors shadow-sm cursor-pointer border-0 font-semibold inline-block"
             >
-              Daftar / Berlangganan
+              Daftar
+            </router-link>
+          </div>
+
+          <!-- Kondisi SUDAH LOGIN -->
+          <div v-else class="flex items-center">
+            <router-link 
+              to="/profile/edit" 
+              class="flex items-center gap-2 bg-brand-tosca-light hover:bg-[#D5F0EB] text-primary rounded-full px-4 py-2 transition-all shadow-sm cursor-pointer border-0 font-medium font-body-md text-body-md dark:bg-on-surface-variant/10 dark:hover:bg-on-surface-variant/20 dark:text-on-surface"
+              :title="'Ubah Profil ' + namaPengguna"
+            >
+              <img 
+                v-if="userProfile?.foto_profil" 
+                :src="userProfile.foto_profil" 
+                alt="Avatar" 
+                class="w-5 h-5 rounded-full object-cover" 
+              />
+              <User v-else class="w-5 h-5 text-primary" />
+              <span>{{ namaPengguna }}</span>
             </router-link>
           </div>
         </div>
 
         <!-- Mobile Menu Button -->
         <div class="md:hidden flex items-center gap-2">
-          <!-- Notifikasi Mobile if logged in -->
-          <div v-if="authStore.sudahLogin" class="relative cursor-pointer text-slate-500 hover:text-primary transition-colors p-2">
+          <!-- Notifikasi Mobile -- sama seperti versi desktop, cuma untuk
+               akun yang sedang aktif berlangganan. -->
+          <button
+            v-if="sudahAktifBerlangganan"
+            type="button"
+            @click="bukaNotifikasi"
+            class="relative cursor-pointer text-slate-500 hover:text-primary transition-colors p-2 bg-transparent border-0"
+            title="Lihat Notifikasi"
+          >
             <Bell class="w-5 h-5" />
             <span v-if="adaNotifikasi" class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error"></span>
-          </div>
-          <button @click="toggleMenu" class="text-on-surface-variant hover:text-primary p-2 cursor-pointer border-0 bg-transparent">
-            <Menu v-if="!menuTerbuka" class="w-6 h-6" />
-            <X v-else class="w-6 h-6" />
           </button>
-        </div>
-      </div>
-
-      <!-- Mobile Menu Drawer -->
-      <div v-show="menuTerbuka" class="md:hidden bg-surface-container-lowest border-b border-outline-variant/30 py-4 px-margin-mobile space-y-3 shadow-md">
-        <a @click="menuTerbuka = false" class="block text-primary font-semibold py-1.5 cursor-pointer">Beranda</a>
-        <router-link to="/tentang" @click="menuTerbuka = false" class="block text-on-surface-variant hover:text-primary py-1.5">Tentang Kami</router-link>
-        <router-link to="/berlangganan" @click="menuTerbuka = false" class="block text-on-surface-variant hover:text-primary py-1.5">Berlangganan</router-link>
-        
-        <div class="pt-3 border-t border-outline-variant/20 flex flex-col gap-2">
-          <div v-if="authStore.sudahLogin" class="flex flex-col gap-2">
-            <router-link
-              :to="profilePath"
-              @click="menuTerbuka = false"
-              class="w-full bg-brand-tosca-light hover:bg-[#D5F0EB] text-primary py-2.5 rounded-xl text-center font-semibold flex items-center justify-center gap-2"
-            >
-              <User class="w-4 h-4" />
-              Edit Profil
-            </router-link>
-            <button
-              @click="navigasiDashboard"
-              class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0"
-            >
-              Dashboard
-            </button>
-          </div>
-          <div v-else class="flex flex-col gap-2">
-            <router-link
-              to="/login"
-              @click="menuTerbuka = false"
-              class="w-full text-on-surface-variant hover:text-primary py-2.5 text-center font-semibold block"
-            >
-              Masuk
-            </router-link>
-            <router-link
-              to="/daftar"
-              @click="menuTerbuka = false"
-              class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold block"
-            >
-              Daftar / Berlangganan
-            </router-link>
-          </div>
+          <button @click="toggleMenu" class="text-on-surface-variant hover:text-primary p-2 cursor-pointer border-0 bg-transparent">
+            <Menu class="w-6 h-6" />
+          </button>
         </div>
       </div>
     </nav>
 
+    <!-- Mobile Sidebar Backdrop -->
+    <div
+      v-if="menuTerbuka"
+      @click="toggleMenu"
+      class="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+    ></div>
+
+    <!-- Mobile Sidebar Drawer -->
+    <aside
+      class="md:hidden fixed top-0 bottom-0 right-0 w-72 max-w-[80vw] bg-surface-container-lowest z-50 border-l border-outline-variant/30 flex flex-col transition-transform duration-300 shadow-xl"
+      :class="menuTerbuka ? 'translate-x-0' : 'translate-x-full'"
+    >
+      <div class="h-20 flex items-center justify-between px-margin-mobile border-b border-outline-variant/30 flex-shrink-0">
+        <img src="/logo-denanta.png" alt="Denanta TranSolution" class="h-12 w-auto" />
+        <button @click="toggleMenu" class="text-on-surface-variant hover:text-on-surface p-1 cursor-pointer border-0 bg-transparent">
+          <X class="w-6 h-6" />
+        </button>
+      </div>
+
+      <nav class="flex-grow overflow-y-auto tanpa-scrollbar px-margin-mobile py-6 flex flex-col gap-3">
+        <a @click="navigasiKe('/'); menuTerbuka = false" :class="kelasMenuBerandaMobile">Beranda</a>
+        <router-link to="/tentang" @click="menuTerbuka = false" :class="kelasMenuTentangMobile">Tentang Kami</router-link>
+        <button
+          type="button"
+          @click="bukaMenuLangganan"
+          :class="[kelasMenuLangganganMobile, 'w-full text-left border-0', route.path === '/berlangganan' ? '' : 'bg-transparent']"
+        >
+          {{ labelMenuLangganan }}
+        </button>
+      </nav>
+
+      <div class="px-margin-mobile py-6 border-t border-outline-variant/20 flex flex-col gap-2 flex-shrink-0">
+        <div v-if="isAuthenticated" class="flex flex-col gap-2">
+          <router-link
+            to="/profile/edit"
+            @click="menuTerbuka = false"
+            class="w-full bg-brand-tosca-light hover:bg-[#D5F0EB] text-primary py-2.5 rounded-xl text-center font-semibold flex items-center justify-center gap-2"
+          >
+            <User class="w-4 h-4" />
+            Edit Profil
+          </router-link>
+          <button
+            @click="navigasiDashboard"
+            class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0"
+          >
+            Dashboard
+          </button>
+        </div>
+        <div v-else class="flex flex-col gap-2">
+          <router-link
+            to="/login"
+            @click="menuTerbuka = false"
+            class="w-full text-on-surface-variant hover:text-primary py-2.5 text-center font-semibold block"
+          >
+            Masuk
+          </router-link>
+          <router-link
+            to="/register"
+            @click="menuTerbuka = false"
+            class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold block"
+          >
+            Daftar
+          </router-link>
+        </div>
+      </div>
+    </aside>
+
     <!-- Background Accents -->
     <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-      <div class="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-primary rounded-full opacity-[0.05] blur-3xl"></div>
-      <div class="absolute bottom-[20%] left-[-10%] w-[500px] h-[500px] bg-primary-container rounded-full opacity-[0.08] blur-3xl"></div>
-      <div class="absolute top-[40%] right-[10%] opacity-10">
+      <div class="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-primary rounded-full opacity-[0.14] blur-3xl"></div>
+      <div class="absolute bottom-[20%] left-[-10%] w-[500px] h-[500px] bg-primary-container rounded-full opacity-[0.20] blur-3xl"></div>
+      <div class="absolute top-[15%] left-[35%] w-[380px] h-[380px] bg-tertiary rounded-full opacity-[0.05] blur-3xl"></div>
+      <div class="absolute top-[40%] right-[10%] opacity-20">
         <svg fill="none" height="100" viewbox="0 0 100 100" width="100" xmlns="http://www.w3.org/2000/svg">
           <circle cx="2" cy="2" fill="#006b5a" r="2"></circle>
           <circle cx="2" cy="22" fill="#006b5a" r="2"></circle>
@@ -234,10 +336,10 @@ const tanganiKirimPesan = () => {
     </div>
 
     <!-- Hero Section -->
-    <section class="max-w-[1280px] mx-auto px-margin-desktop py-xl md:py-[80px] flex flex-col md:flex-row items-center gap-gutter relative z-10">
+    <section class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-[80px] flex flex-col md:flex-row items-center gap-gutter relative z-10">
       <div class="md:w-1/2 flex flex-col gap-6 z-10 text-left">
-        <h1 class="font-display-lg text-display-lg text-on-background tracking-tight leading-tight">
-          Pantau Perjalanan Anak dengan <span class="text-primary">Aman &amp; Nyata</span> di Padang.
+        <h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-display-lg md:text-display-lg text-on-background tracking-tight leading-tight">
+          Pantau Perjalanan Anak dengan <span class="bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent">Aman &amp; Nyata</span> di Padang.
         </h1>
         <p class="font-body-lg text-body-lg text-on-surface-variant max-w-lg leading-relaxed">
           Memberikan ketenangan pikiran bagi orang tua dengan layanan antar jemput sekolah yang profesional, terpantau secara real-time, dan mengutamakan keselamatan.
@@ -256,45 +358,66 @@ const tanganiKirimPesan = () => {
         </div>
       </div>
       <div class="md:w-1/2 relative">
-        <div class="absolute inset-0 bg-primary-container rounded-full opacity-[0.05] blur-xl transform scale-110"></div>
-        <img 
-          alt="Sekolah van aman" 
-          class="w-full h-auto object-contain relative z-10 rounded-xl soft-shadow" 
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuAe-ugMKVt9E5FgbxlUMYfMaz-UFiNVbiOZuTjCV4X1dGYqb5ByvrgT0hag9gW446L6IVjK2wgVNd7t0PWMhfG3d89eR_ZiuwzPqDj9eFh1o7qDlRaaxJ9dt4QLXGwJcz03KNarEdJLJUmsfDDLMwgvkp4ZTz0M5Z0KF1DM3-2od3j7f4ElpW9sO1gLFeojDf6P7OerFUNqDh9cRdLT7kgYiWs-nxyQBPAVvvAVRkj919aLDNuGoYBatRP-7qjEpqpo24wpxko8cvE"
-        />
+        <div class="absolute inset-0 bg-primary-container rounded-full opacity-[0.15] blur-xl transform scale-110"></div>
+        <!-- Bingkai gradien sebagai "border" -- padding pada wrapper luar
+             menyisakan celah warna gradien primary di sekeliling kotak
+             gambar, dipisah dari kotak dalam (yang aspect-ratio-nya tetap,
+             lihat catatan di bawah) supaya bingkainya tidak ikut terpotong
+             oleh overflow-hidden si kotak gambar. -->
+        <div class="relative z-10 w-full max-w-md mx-auto p-2 rounded-[20px] bg-gradient-to-br from-primary via-emerald-500 to-primary-container shadow-xl shadow-primary/30">
+          <!-- Wrapper diberi aspect-ratio tetap supaya kedua gambar (yang
+               keluar & yang masuk) bisa ditumpuk absolute selama crossfade --
+               tanpa ini, transisi fade biasa (mode default, tanpa out-in)
+               akan membuat tinggi kotak "melompat" begitu ukuran gambar
+               berikutnya beda dari yang sebelumnya. -->
+          <div class="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-white">
+            <!-- Tanpa mode="out-in" secara SENGAJA -- gambar lama & baru
+                 perlu tumpang tindih (sama-sama ada di DOM sesaat) selama
+                 transisi supaya hasilnya crossfade mulus, bukan berkedip ke
+                 kosong dulu baru muncul. -->
+            <Transition name="fade-hero">
+              <img
+                :key="indeksGambarHero"
+                :src="gambarHero[indeksGambarHero]"
+                alt="Denanta TranSolution"
+                class="absolute inset-0 w-full h-full object-cover"
+              />
+            </Transition>
+          </div>
+        </div>
       </div>
     </section>
 
     <!-- Keunggulan Section -->
-    <section class="max-w-[1280px] mx-auto px-margin-desktop py-xl relative z-10">
+    <section class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-xl relative z-10">
       <div class="text-center mb-12">
-        <h2 class="font-headline-lg text-headline-lg text-on-background mb-4">Mengapa Memilih Denanta?</h2>
+        <h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-background mb-4">Mengapa Memilih Denanta?</h2>
         <p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">Kami mengutamakan keamanan dan kenyamanan anak Anda dengan standar pelayanan terbaik.</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
         <div class="bg-surface-container-lowest rounded-xl p-lg soft-shadow flex flex-col items-center text-center hover:-translate-y-1 transition-transform duration-300">
-          <div class="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-6 text-primary">
+          <div class="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-full flex items-center justify-center mb-6 text-white shadow-lg shadow-primary/30">
             <MapPin class="w-8 h-8" />
           </div>
           <h3 class="font-title-lg text-title-lg mb-2 text-on-background">Live Tracking</h3>
           <p class="font-body-md text-body-md text-on-surface-variant">Pantau lokasi kendaraan secara langsung kapan saja di peta interaktif.</p>
         </div>
         <div class="bg-surface-container-lowest rounded-xl p-lg soft-shadow flex flex-col items-center text-center hover:-translate-y-1 transition-transform duration-300">
-          <div class="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-6 text-primary">
+          <div class="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-full flex items-center justify-center mb-6 text-white shadow-lg shadow-primary/30">
             <ShieldCheck class="w-8 h-8" />
           </div>
           <h3 class="font-title-lg text-title-lg mb-2 text-on-background">Driver Terverifikasi</h3>
-          <p class="font-body-md text-body-md text-on-surface-variant">Pengemudi profesional dan terlatih melalui seleksi SKCK &amp; SIM yang ketat.</p>
+          <p class="font-body-md text-body-md text-on-surface-variant">Pengemudi profesional dan terlatih, dokumen KTP &amp; SIM diverifikasi sebelum bertugas.</p>
         </div>
         <div class="bg-surface-container-lowest rounded-xl p-lg soft-shadow flex flex-col items-center text-center hover:-translate-y-1 transition-transform duration-300">
-          <div class="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-6 text-primary">
+          <div class="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-full flex items-center justify-center mb-6 text-white shadow-lg shadow-primary/30">
             <Bell class="w-8 h-8" />
           </div>
           <h3 class="font-title-lg text-title-lg mb-2 text-on-background">Notifikasi Real-time</h3>
-          <p class="font-body-md text-body-md text-on-surface-variant">Terima pemberitahuan instan otomatis via WhatsApp saat anak dijemput &amp; sampai.</p>
+          <p class="font-body-md text-body-md text-on-surface-variant">Terima pemberitahuan instan otomatis di aplikasi saat anak dijemput &amp; sampai.</p>
         </div>
         <div class="bg-surface-container-lowest rounded-xl p-lg soft-shadow flex flex-col items-center text-center hover:-translate-y-1 transition-transform duration-300">
-          <div class="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mb-6 text-primary">
+          <div class="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-full flex items-center justify-center mb-6 text-white shadow-lg shadow-primary/30">
             <Clock class="w-8 h-8" />
           </div>
           <h3 class="font-title-lg text-title-lg mb-2 text-on-background">Tepat Waktu</h3>
@@ -304,17 +427,17 @@ const tanganiKirimPesan = () => {
     </section>
 
     <!-- Manfaat Section -->
-    <section class="w-full bg-[#E6F7F4] py-24 relative z-10">
-      <div class="max-w-[1280px] mx-auto px-margin-desktop grid grid-cols-1 md:grid-cols-2 items-center gap-16">
+    <section class="w-full bg-gradient-to-br from-brand-tosca-light via-[#CDF2E9] to-[#A8E8D6] py-16 md:py-24 relative z-10">
+      <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop grid grid-cols-1 md:grid-cols-2 items-center gap-10 md:gap-16">
         <div class="order-2 md:order-1">
-          <img 
-            alt="Manfaat Layanan" 
-            class="w-full h-auto rounded-xl soft-shadow" 
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAV33hEk4QkjvS09aHH3ExKDxjBuaz8vMVO0gS4820Uigj7gSpaJs_9yeFEOijSrqz3KnmvnQO12Ro3-oiWsdCLgBTda6Bji0A4Ji4r08bOKkwZj2XSA5ldyU13NapM3bOXEwUfW4Vbt4N5IeLIgZyscb2dHmwBzGD2ug8j-jIQwIcEeMKD80e6hQVpQVHILlOQ7I0JTA09pnqmIqI_w5NOaoVNRwdmWNZxcCf9D7vNhewz-KNaWiaTSvs2JBXxjrRblBAypMWpMj8"
+          <img
+            alt="Manfaat Layanan"
+            class="w-full h-auto rounded-xl soft-shadow"
+            src="/aset/manfaat-layanan.png"
           />
         </div>
         <div class="flex flex-col gap-8 order-1 md:order-2 text-left">
-          <h2 class="font-headline-lg text-headline-lg text-on-background">Manfaat Utama Layanan Kami</h2>
+          <h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-background">Manfaat Utama Layanan Kami</h2>
           <div class="flex flex-col gap-6">
             <div class="flex items-start gap-4">
               <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center shrink-0 text-on-primary">
@@ -350,35 +473,35 @@ const tanganiKirimPesan = () => {
 
     <!-- Cara Kerja Section -->
     <span id="cara-kerja" class="block relative -top-24"></span>
-    <section class="max-w-[1280px] mx-auto px-margin-desktop py-24 relative overflow-hidden z-10">
-      <div class="text-center mb-20">
-        <h2 class="font-headline-lg text-headline-lg mb-4 text-on-background">Cara Kerja Kami</h2>
+    <section class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-16 md:py-24 relative overflow-hidden z-10">
+      <div class="text-center mb-12 md:mb-20">
+        <h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg mb-4 text-on-background">Cara Kerja Kami</h2>
         <p class="font-body-lg text-on-surface-variant">Langkah mudah untuk memulai layanan antar jemput Denanta.</p>
       </div>
-      <div class="relative flex flex-col md:flex-row justify-between items-start gap-12 md:gap-0">
+      <div class="relative flex flex-col md:flex-row justify-between items-start gap-10 md:gap-0">
         <!-- Connector Line -->
-        <div class="hidden md:block absolute top-10 left-[10%] right-[10%] border-t-2 border-dashed border-primary/30 z-0"></div>
+        <div class="hidden md:block absolute top-10 left-[10%] right-[10%] border-t-2 border-dashed border-primary/50 z-0"></div>
         <!-- Step 1 -->
         <div class="flex flex-col items-center text-center flex-1 relative z-10">
-          <div class="w-20 h-20 bg-primary text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg border-4 border-solid border-white">1</div>
+          <div class="w-20 h-20 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg shadow-primary/40 border-4 border-solid border-white">1</div>
           <h4 class="font-title-lg mb-2 text-on-background">Pendaftaran</h4>
           <p class="font-body-md text-on-surface-variant px-4">Lengkapi formulir pendaftaran dan tentukan lokasi penjemputan di peta.</p>
         </div>
         <!-- Step 2 -->
         <div class="flex flex-col items-center text-center flex-1 relative z-10">
-          <div class="w-20 h-20 bg-primary text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg border-4 border-solid border-white">2</div>
+          <div class="w-20 h-20 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg shadow-primary/40 border-4 border-solid border-white">2</div>
           <h4 class="font-title-lg mb-2 text-on-background">Penjadwalan</h4>
           <p class="font-body-md text-on-surface-variant px-4">Tim kami akan mengatur rute dan mencocokkan jadwal supir terdekat.</p>
         </div>
         <!-- Step 3 -->
         <div class="flex flex-col items-center text-center flex-1 relative z-10">
-          <div class="w-20 h-20 bg-primary text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg border-4 border-solid border-white">3</div>
+          <div class="w-20 h-20 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg shadow-primary/40 border-4 border-solid border-white">3</div>
           <h4 class="font-title-lg mb-2 text-on-background">Penjemputan</h4>
           <p class="font-body-md text-on-surface-variant px-4">Driver menjemput anak Anda sesuai jadwal dengan armada resmi dan aman.</p>
         </div>
         <!-- Step 4 -->
         <div class="flex flex-col items-center text-center flex-1 relative z-10">
-          <div class="w-20 h-20 bg-primary text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg border-4 border-solid border-white">4</div>
+          <div class="w-20 h-20 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full flex items-center justify-center font-display-lg text-2xl mb-6 shadow-lg shadow-primary/40 border-4 border-solid border-white">4</div>
           <h4 class="font-title-lg mb-2 text-on-background">Pantau Real-time</h4>
           <p class="font-body-md text-on-surface-variant px-4">Terima notifikasi WhatsApp dan pantau perjalanan anak lewat web maps.</p>
         </div>
@@ -386,64 +509,34 @@ const tanganiKirimPesan = () => {
     </section>
 
     <!-- Estimasi Biaya Section -->
-    <section class="max-w-[1280px] mx-auto px-margin-desktop py-24 relative z-10">
-      <div class="text-center mb-16">
-        <h2 class="font-headline-lg text-headline-lg mb-4 text-on-background">Estimasi Biaya</h2>
+    <section class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-16 md:py-24 relative z-10">
+      <div class="text-center mb-10 md:mb-16">
+        <h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg mb-4 text-on-background">Estimasi Biaya</h2>
         <p class="font-body-lg text-on-surface-variant">Pilih paket layanan yang sesuai dengan kebutuhan Anda.</p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter max-w-4xl mx-auto items-stretch">
         <!-- Card 1 -->
-        <div class="bg-surface-container-lowest border border-solid border-outline-variant rounded-xl p-6 flex flex-col soft-shadow justify-between text-left">
-          <div>
-            <h3 class="font-headline-md text-headline-md mb-2 text-on-background">Antar Jemput (PP)</h3>
-            <div class="flex items-baseline gap-1 mb-6">
-              <span class="text-3xl font-bold text-primary">Rp 450.000</span>
-              <span class="text-on-surface-variant text-sm">/bulan</span>
-            </div>
-            <ul class="flex flex-col gap-3 mb-6">
-              <li class="flex items-center gap-2">
-                <Check class="text-primary w-5 h-5 shrink-0" />
-                <span class="font-body-md text-on-background">Antar pagi &amp; Jemput siang/sore</span>
-              </li>
-              <li class="flex items-center gap-2">
-                <Check class="text-primary w-5 h-5 shrink-0" />
-                <span class="font-body-md text-on-background">Laporan perjalanan harian</span>
-              </li>
-              <li class="flex items-center gap-2">
-                <Check class="text-primary w-5 h-5 shrink-0" />
-                <span class="font-body-md text-on-background">Asuransi perlindungan jiwa</span>
-              </li>
-            </ul>
-          </div>
-          <router-link to="/berlangganan">
-            <button class="w-full border-2 border-solid border-primary text-primary font-label-md py-3 rounded-xl hover:bg-brand-tosca-light transition-colors bg-transparent cursor-pointer">
-              Pilih Paket
-            </button>
-          </router-link>
-        </div>
-
-        <!-- Card 2 -->
         <div class="bg-primary text-on-primary rounded-xl p-6 flex flex-col shadow-xl relative z-10 justify-between text-left">
           <div class="absolute -top-4 right-6 bg-warnaTombol text-white px-3 py-1 rounded-full text-xs font-bold shadow-md">POPULER</div>
           <div>
-            <h3 class="font-headline-md text-headline-md mb-2 text-white">Antar / Jemput Saja</h3>
+            <h3 class="font-headline-md text-headline-md mb-2 text-white">Antar Jemput (PP)</h3>
             <div class="flex items-baseline gap-1 mb-6">
-              <span class="text-3xl font-bold text-white">Rp 250.000</span>
+              <span class="text-3xl font-bold text-white">{{ hargaAntarJemput }}</span>
               <span class="opacity-80 text-sm">/bulan</span>
             </div>
             <ul class="flex flex-col gap-3 mb-6">
               <li class="flex items-center gap-2">
                 <Check class="text-white w-5 h-5 shrink-0" />
-                <span class="font-body-md text-white">Hanya Antar atau Hanya Jemput</span>
+                <span class="font-body-md text-white">Antar pagi &amp; Jemput siang/sore</span>
               </li>
               <li class="flex items-center gap-2">
                 <Check class="text-white w-5 h-5 shrink-0" />
-                <span class="font-body-md text-white">Notifikasi real-time via WA</span>
+                <span class="font-body-md text-white">Laporan perjalanan harian</span>
               </li>
               <li class="flex items-center gap-2">
                 <Check class="text-white w-5 h-5 shrink-0" />
-                <span class="font-body-md text-white">Layanan darurat 24/7</span>
+                <span class="font-body-md text-white">Struk &amp; riwayat pembayaran digital</span>
               </li>
             </ul>
           </div>
@@ -453,57 +546,44 @@ const tanganiKirimPesan = () => {
             </button>
           </router-link>
         </div>
-      </div>
-    </section>
 
-    <!-- Testimoni Section -->
-    <section class="max-w-[1280px] mx-auto px-margin-desktop py-24 relative z-10">
-      <div class="text-center mb-16">
-        <h2 class="font-headline-lg text-headline-lg mb-4 text-on-background">Apa Kata Orang Tua</h2>
-        <p class="font-body-lg text-on-surface-variant">Kisah nyata kenyamanan dan ketenangan dari pengguna setia kami.</p>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
-        <!-- Testi 1 -->
-        <div class="bg-surface-container-lowest p-8 rounded-xl soft-shadow border border-solid border-outline-variant/30 italic flex flex-col justify-between text-left">
-          <p class="font-body-md mb-6 text-on-background">"Sangat terbantu dengan Denanta. Sekarang tidak perlu khawatir lagi kalau saya lembur kerja, karena posisi anak bisa dipantau lewat aplikasi secara real-time."</p>
-          <div class="flex items-center gap-4 not-italic">
-            <img alt="Bunda Sarah" class="w-12 h-12 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAS7Fl4QeGHQHhLEMakUJ-rh-JdwWnkXYpbdMOcr6CIMWZi1qg_v9Up5D9SqXRmSX14w8jHvnj5UaG5LOjoB1CpcFbQOuSwDk8fcdA3f12RGlM_q62zD1TfAVkQl-C4bBkXGqsqRB9kPwY80rdzhXjFSBo_RwiOaK8hxPOcluFJnDrO8U3HWkQ6PMmew0xI1T5iAn3_z9-HI_hli5JCPNSBNgxdR4UAuP4dtwZncnu8XXPR6cfWRHFWiAlep9jv1D40XSZQKW0tA2Q"/>
-            <div>
-              <p class="font-label-md font-bold text-on-background">Ibu Sarah</p>
-              <p class="text-[11px] text-on-surface-variant">Orang Tua Murid (SD N 01 Padang)</p>
+        <!-- Card 2 -->
+        <div class="bg-gradient-to-br from-white to-brand-tosca-light border-2 border-solid border-primary/20 rounded-xl p-6 flex flex-col soft-shadow justify-between text-left">
+          <div>
+            <h3 class="font-headline-md text-headline-md mb-2 text-on-background">Antar / Jemput Saja</h3>
+            <div class="flex items-baseline gap-1 mb-6">
+              <span class="text-3xl font-bold text-primary">{{ hargaAntarSaja }}</span>
+              <span class="text-on-surface-variant text-sm">/bulan</span>
             </div>
+            <ul class="flex flex-col gap-3 mb-6">
+              <li class="flex items-center gap-2">
+                <Check class="text-primary w-5 h-5 shrink-0" />
+                <span class="font-body-md text-on-background">Hanya Antar atau Hanya Jemput</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <Check class="text-primary w-5 h-5 shrink-0" />
+                <span class="font-body-md text-on-background">Notifikasi real-time via WA</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <Check class="text-primary w-5 h-5 shrink-0" />
+                <span class="font-body-md text-on-background">Pemantauan lokasi GPS langsung</span>
+              </li>
+            </ul>
           </div>
-        </div>
-        <!-- Testi 2 -->
-        <div class="bg-surface-container-lowest p-8 rounded-xl soft-shadow border border-solid border-outline-variant/30 italic flex flex-col justify-between text-left">
-          <p class="font-body-md mb-6 text-on-background">"Driver-nya ramah dan mobilnya selalu bersih. Anak saya jadi selalu semangat berangkat sekolah tepat waktu setiap pagi tanpa drama."</p>
-          <div class="flex items-center gap-4 not-italic">
-            <img alt="Pak Budi" class="w-12 h-12 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCYST3mOceaUuJu4u9SdaUTAH0MtOehHzBjG2RYzAVlJiuLfB00-TnpkqT6AfGPLIlBW1a_Bpejj2j6Nowtrd13viZJBPOIRnaFEYVdjZ9tcHAhl1W3o0syyaq_GQxtVAOw5UE5mA-QYJiWESl255E5LsscRzzu0ORH1Ni8L3Ldk270i4BRR1Bkc6sEfM4tkVPeRV4dQGHkj62K7zrYLyHD96CCOZP3r9sJsfnlNABS-YtKSIp9d-7lSBmMXCc6uPkHeofwXdLQ510"/>
-            <div>
-              <p class="font-label-md font-bold text-on-background">Bapak Budi</p>
-              <p class="text-[11px] text-on-surface-variant">Orang Tua Murid (SMP N 1 Padang)</p>
-            </div>
-          </div>
-        </div>
-        <!-- Testi 3 -->
-        <div class="bg-surface-container-lowest p-8 rounded-xl soft-shadow border border-solid border-outline-variant/30 italic flex flex-col justify-between text-left">
-          <p class="font-body-md mb-6 text-on-background">"Cucu saya aman terjaga perjalanannya. Tim admin Denanta sangat kooperatif memberi informasi cepat jika ada kendala cuaca di jalan."</p>
-          <div class="flex items-center gap-4 not-italic">
-            <img alt="Oma Dewi" class="w-12 h-12 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuANMJx6HBT0cmmTHDqH5XO7tJvWRPO53Iqj_TEjwg84_DKZrEKEecnfDdvB5AUykmK1SMXXGYyreehpISI4zooPlL3515umtPyzEd5lXm7xI4q5Rj17X4IqpI_lVefFNF5FGiwZ9lSwe4XYCav8xUCwLAOg6qGN47cUFLxkm15E6q9LQ4iyE-1Y5jFE-L0NXZpQYXloxyvYyUXM0ZFIJfamYIoIMfWL9g-bDtb712wy-4IFkIuzl9JI_LMH9kWpp6CpdUS-ANaPqc8"/>
-            <div>
-              <p class="font-label-md font-bold text-on-background">Oma Dewi</p>
-              <p class="text-[11px] text-on-surface-variant">Keluarga Murid (SMA N 2 Padang)</p>
-            </div>
-          </div>
+          <router-link to="/berlangganan">
+            <button class="w-full border-2 border-solid border-primary text-primary font-label-md py-3 rounded-xl hover:bg-brand-tosca-light transition-colors bg-transparent cursor-pointer">
+              Pilih Paket
+            </button>
+          </router-link>
         </div>
       </div>
     </section>
 
     <!-- FAQ Section -->
     <span id="faq" class="block relative -top-24"></span>
-    <section class="max-w-[800px] mx-auto px-margin-desktop py-24 relative z-10">
+    <section class="max-w-[800px] mx-auto px-margin-mobile md:px-margin-desktop py-16 md:py-24 relative z-10">
       <div class="text-center mb-12">
-        <h2 class="font-headline-lg text-headline-lg text-on-background">Pertanyaan Umum (FAQ)</h2>
+        <h2 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-on-background">Pertanyaan Umum (FAQ)</h2>
         <p class="text-on-surface-variant font-body-md mt-2">Dapatkan jawaban instan terkait layanan dan teknis Denanta.</p>
       </div>
       <div class="flex flex-col gap-4">
@@ -528,7 +608,7 @@ const tanganiKirimPesan = () => {
           </div>
           <div 
             v-show="faq.terbuka" 
-            class="mt-3 text-on-surface-variant font-body-md pl-7 leading-relaxed bg-[#E6F7F4]/30 p-3 rounded-lg border border-solid border-brand-tosca-light"
+            class="mt-3 text-on-surface-variant font-body-md pl-7 leading-relaxed bg-brand-tosca-light/70 p-3 rounded-lg border border-solid border-primary/25"
           >
             {{ faq.jawab }}
           </div>
@@ -536,136 +616,17 @@ const tanganiKirimPesan = () => {
       </div>
     </section>
 
-    <!-- Kontak Section -->
-    <span id="kontak" class="block relative -top-24"></span>
-    <section class="w-full bg-[#E6F7F4] py-24 relative z-10">
-      <div class="max-w-[1280px] mx-auto px-margin-desktop grid grid-cols-1 md:grid-cols-2 gap-16">
-        <!-- Kirim Pesan Form -->
-        <div class="bg-surface-container-lowest p-8 md:p-10 rounded-xl shadow-lg border border-solid border-white text-left relative overflow-hidden">
-          <h2 class="font-headline-md text-headline-md mb-8 text-on-background">Kirim Pesan</h2>
-          
-          <!-- Success Notification -->
-          <div v-if="berhasilKirim" class="mb-6 bg-emerald-50 border border-solid border-emerald-300 p-4 rounded-xl flex items-start gap-3">
-            <CheckCircle class="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p class="font-semibold text-emerald-800 text-sm">Pesan Terkirim!</p>
-              <p class="text-xs text-emerald-700 mt-0.5">Terima kasih. Tim kami akan segera merespons pesan Anda via email.</p>
-            </div>
-          </div>
-
-          <form class="flex flex-col gap-6" @submit.prevent="tanganiKirimPesan">
-            <div>
-              <label class="font-label-md block mb-2 text-on-background">Nama Lengkap</label>
-              <input 
-                v-model="namaForm"
-                required
-                placeholder="Masukkan nama Anda"
-                class="w-full border border-solid border-outline-variant rounded-xl p-3 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all bg-white text-on-background" 
-                type="text"
-              />
-            </div>
-            <div>
-              <label class="font-label-md block mb-2 text-on-background">Email</label>
-              <input 
-                v-model="emailForm"
-                required
-                placeholder="nama@email.com"
-                class="w-full border border-solid border-outline-variant rounded-xl p-3 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all bg-white text-on-background" 
-                type="email"
-              />
-            </div>
-            <div>
-              <label class="font-label-md block mb-2 text-on-background">Pesan</label>
-              <textarea 
-                v-model="pesanForm"
-                required
-                placeholder="Tulis pesan atau pertanyaan Anda di sini..."
-                class="w-full border border-solid border-outline-variant rounded-xl p-3 h-32 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all bg-white text-on-background"
-              ></textarea>
-            </div>
-            <button 
-              type="submit"
-              :disabled="sedangMengirim"
-              class="bg-primary text-on-primary font-label-md py-4 rounded-xl shadow-md hover:bg-[#0D7A68] transition-colors border-0 cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Loader2 v-if="sedangMengirim" class="w-5 h-5 animate-spin" />
-              <Send v-else class="w-4 h-4" />
-              <span>{{ sedangMengirim ? 'Mengirim...' : 'Kirim Pesan' }}</span>
-            </button>
-          </form>
-        </div>
-
-        <!-- Hubungi Kami Info -->
-        <div class="flex flex-col gap-10 text-left justify-center">
-          <div>
-            <h2 class="font-headline-md text-headline-md mb-4 text-on-background">Hubungi Kami</h2>
-            <p class="font-body-lg text-on-surface-variant leading-relaxed">Tim customer support kami selalu siap membantu Anda memberikan solusi antar jemput anak sekolah terbaik.</p>
-          </div>
-          <div class="flex flex-col gap-6">
-            <div class="flex items-center gap-4">
-              <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary soft-shadow shrink-0">
-                <Phone class="w-6 h-6" />
-              </div>
-              <div>
-                <p class="text-label-md text-on-surface-variant">WhatsApp Kami</p>
-                <a href="https://wa.me/6281234567890" target="_blank" class="font-title-lg text-on-background hover:text-primary transition-colors">+62 812-3456-7890</a>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary soft-shadow shrink-0">
-                <Mail class="w-6 h-6" />
-              </div>
-              <div>
-                <p class="text-label-md text-on-surface-variant">Email Resmi</p>
-                <a href="mailto:halo@denanta.com" class="font-title-lg text-on-background hover:text-primary transition-colors">halo@denanta.com</a>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary soft-shadow shrink-0">
-                <Share class="w-6 h-6 text-primary" />
-              </div>
-              <div class="flex gap-4 items-center">
-                <a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#"><Instagram class="w-6 h-6" /></a>
-                <a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer" href="#"><Facebook class="w-6 h-6" /></a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="bg-surface-container-lowest dark:bg-surface-dim border-t border-solid border-outline-variant/30 w-full py-16 relative z-10">
-      <div class="flex flex-col md:flex-row justify-between items-start px-margin-desktop gap-gutter max-w-[1280px] mx-auto text-left">
-        <div class="flex flex-col gap-4">
-          <span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed flex items-center">
-            <Bus class="h-6 w-6 text-primary mr-2" />
-            Denanta TranSolution
-          </span>
-          <span class="font-body-md text-body-md text-on-surface-variant max-w-sm leading-relaxed">Memberikan solusi mobilitas yang aman, cerdas, dan terpercaya bagi generasi masa depan di Padang.</span>
-          <span class="font-body-md text-body-md text-on-surface-variant mt-4">© {{ new Date().getFullYear() }} Denanta TranSolution. All rights reserved.</span>
-        </div>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-12">
-          <div class="flex flex-col gap-4">
-            <h5 class="font-label-md font-bold text-on-background">Perusahaan</h5>
-            <router-link to="/tentang" class="text-on-surface-variant font-body-md hover:text-primary transition-colors">Tentang Kami</router-link>
-            <a class="text-on-surface-variant font-body-md hover:text-primary transition-colors cursor-pointer" href="#">Karir</a>
-            <a class="text-on-surface-variant font-body-md hover:text-primary transition-colors cursor-pointer" href="#">Mitra</a>
-          </div>
-          <div class="flex flex-col gap-4">
-            <h5 class="font-label-md font-bold text-on-background">Layanan</h5>
-            <router-link to="/berlangganan" class="text-on-surface-variant font-body-md hover:text-primary transition-colors">Antar Jemput</router-link>
-            <router-link to="/berlangganan" class="text-on-surface-variant font-body-md hover:text-primary transition-colors">Aplikasi Ortu</router-link>
-            <router-link to="/berlangganan" class="text-on-surface-variant font-body-md hover:text-primary transition-colors">Rute</router-link>
-          </div>
-          <div class="flex flex-col gap-4">
-            <h5 class="font-label-md font-bold text-on-background">Bantuan</h5>
-            <a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#faq">FAQ</a>
-            <a class="text-on-surface-variant font-body-md hover:text-primary transition-colors" href="#kontak">Kontak</a>
-            <a class="text-on-surface-variant font-body-md hover:text-primary transition-colors cursor-pointer" href="#">Privasi</a>
-          </div>
-        </div>
-      </div>
-    </footer>
+    <FooterPublik />
   </div>
 </template>
+
+<style scoped>
+.fade-hero-enter-active,
+.fade-hero-leave-active {
+  transition: opacity 0.9s ease;
+}
+.fade-hero-enter-from,
+.fade-hero-leave-to {
+  opacity: 0;
+}
+</style>
