@@ -56,6 +56,44 @@ const langkahAktif = ref<number>(modeTambahAnak.value ? 2 : authStore.sudahLogin
 const sedangMemuat = ref(true);
 const sedangMemproses = ref(false);
 
+// Pindah tahap wizard lewat router.push (query ?langkah=) -- BUKAN sekadar
+// mengubah langkahAktif.value langsung -- supaya tiap perpindahan tahap
+// tercatat sebagai entri riwayat browser. Tanpa ini, tombol back
+// perangkat/browser dari tahap manapun (mis. Tahap 3) tidak mundur ke
+// tahap sebelumnya (Tahap 2), melainkan langsung keluar dari wizard ke
+// halaman sebelum /berlangganan dibuka (mis. Landing Page) -- sama seperti
+// akar masalah tab dashboard yang sudah dibenahi sebelumnya (lihat
+// HalamanOrangTua.vue). Efek sampingnya justru menyelesaikan masalah kedua
+// (data Tahap 2 hilang setelah back): karena berpindah tahap sekarang
+// TIDAK PERNAH meng-unmount komponen ini (cuma query yang berubah pada
+// rute yang sama), seluruh state lokal (listAnak, namaOrangTua, dst) tetap
+// utuh di memori persis seperti sebelum tombol back ditekan.
+const pergiKeLangkah = (n: number) => {
+  router.push({ path: route.path, query: { ...route.query, langkah: String(n) } });
+};
+
+// Dipakai KHUSUS saat penentuan tahap awal di onMounted (bukan navigasi
+// yang dipicu aksi pengguna) -- replace, bukan push, supaya penentuan
+// otomatis ini tidak menumpuk entri riwayat baru di atas entri yang
+// membawa pengguna ke /berlangganan.
+const tetapkanLangkahAwal = (n: number) => {
+  langkahAktif.value = n;
+  router.replace({ path: route.path, query: { ...route.query, langkah: String(n) } });
+};
+
+// Sinkronkan langkahAktif dengan route.query.langkah -- berlaku saat tombol
+// back/forward perangkat/browser dipakai (Vue Router memicu ulang
+// route.query begitu riwayat berpindah, walau komponen ini tidak
+// di-unmount karena masih di rute /berlangganan yang sama).
+watch(
+  () => route.query.langkah,
+  (nilai) => {
+    if (typeof nilai !== 'string') return;
+    const n = Number(nilai);
+    if (Number.isFinite(n)) langkahAktif.value = n;
+  }
+);
+
 // Hitung persentase garis progress bar (0%, 33.3%, 66.6%, 100%)
 const progressLineWidth = computed(() => {
   if (langkahAktif.value <= 1) return '0%';
@@ -495,10 +533,10 @@ onMounted(async () => {
       );
 
       const semuaPunyaTagihan = listAnak.value.every((a) => a.langgananId && a.pembayaranId);
-      langkahAktif.value = semuaPunyaTagihan ? 4 : 3;
+      tetapkanLangkahAwal(semuaPunyaTagihan ? 4 : 3);
     } else {
       listAnak.value = [];
-      langkahAktif.value = modeTambahAnak.value ? 2 : 1;
+      tetapkanLangkahAwal(modeTambahAnak.value ? 2 : 1);
     }
   } catch (err: any) {
     picuToast(err.message || 'Gagal memuat status langganan Anda.', 'error');
@@ -531,7 +569,7 @@ const simpanProfilOrangTua = async () => {
       nomorWhatsapp: waOrangTua.value
     });
     picuToast('Data profil orang tua berhasil disimpan!', 'sukses');
-    langkahAktif.value = 2;
+    pergiKeLangkah(2);
   } catch (err: any) {
     picuToast(err.message || 'Gagal menyimpan profil.', 'error');
   } finally {
@@ -722,7 +760,7 @@ const selesaikanLangkahAnak = async () => {
     picuToast('Silakan tambahkan minimal satu data anak sekolah', 'error');
     return;
   }
-  langkahAktif.value = 3;
+  pergiKeLangkah(3);
 };
 
 const selesaikanLangkahJenisLayanan = () => {
@@ -802,7 +840,7 @@ const konfirmasiLanjutLangkah3 = async () => {
     }
 
     modalRingkasanTampil.value = false;
-    langkahAktif.value = 4;
+    pergiKeLangkah(4);
   } catch (err: any) {
     picuToast(err.message || 'Gagal menyiapkan tagihan langganan.', 'error');
   } finally {
@@ -1318,7 +1356,7 @@ const unduhStruk = () => {
 
           <button
             type="button"
-            @click="modeTambahAnak ? kembaliKeDashboard() : (langkahAktif = 1)"
+            @click="modeTambahAnak ? kembaliKeDashboard() : pergiKeLangkah(1)"
             class="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#14a38b] transition-colors bg-transparent border-0 cursor-pointer mb-4 -ml-1 px-1 py-1"
           >
             <ArrowLeft class="w-4 h-4" />
@@ -1535,7 +1573,7 @@ const unduhStruk = () => {
           <div class="flex justify-between items-center pt-6 border-t border-slate-100 mt-6">
             <button
               type="button"
-              @click="modeTambahAnak ? kembaliKeDashboard() : (langkahAktif = 1)"
+              @click="modeTambahAnak ? kembaliKeDashboard() : pergiKeLangkah(1)"
               class="px-8 py-3 rounded-[12px] text-slate-500 font-semibold hover:text-slate-700 transition-colors bg-transparent border-0 cursor-pointer text-sm"
             >
               Kembali
@@ -1676,7 +1714,7 @@ const unduhStruk = () => {
           <div class="flex justify-between items-center pt-6 border-t border-slate-100 mt-6">
             <button
               type="button"
-              @click="langkahAktif = 2"
+              @click="pergiKeLangkah(2)"
               class="px-8 py-3 rounded-[12px] text-slate-500 font-semibold hover:text-slate-700 transition-colors bg-transparent border-0 cursor-pointer text-sm"
             >
               Kembali
@@ -1772,7 +1810,7 @@ const unduhStruk = () => {
                   type="button"
                   :disabled="sedangMemproses"
                   class="px-6 py-2.5 rounded-[12px] text-slate-500 font-semibold hover:text-slate-700 transition-colors bg-transparent border-0 cursor-pointer text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  @click="langkahAktif = 3"
+                  @click="pergiKeLangkah(3)"
                 >
                   Kembali
                 </button>

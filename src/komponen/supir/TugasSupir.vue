@@ -264,7 +264,15 @@ const mulaiDemoSimulasi = async () => {
 };
 // import.meta tidak bisa dipakai langsung di ekspresi template Vue,
 // makanya nilainya "dititipkan" ke variabel biasa dulu di sini.
-const modeDev = import.meta.env.DEV;
+//
+// SEBELUMNYA cuma import.meta.env.DEV -- otomatis bernilai false di build
+// produksi (npm run build, termasuk yang di-deploy ke Vercel), jadi tombol
+// ini ikut hilang total begitu di-hosting walau fiturnya masih dibutuhkan
+// utk demo/sidang di lingkungan production juga. Sama seperti widget
+// Simulasi Waktu (App.vue), sekarang bisa tetap ditampilkan di build
+// produksi lewat env var VITE_TAMPILKAN_SIMULASI_WAKTU=true (dipasang di
+// Vercel), tanpa perlu jalankan npm run dev.
+const modeDev = import.meta.env.DEV || import.meta.env.VITE_TAMPILKAN_SIMULASI_WAKTU === 'true';
 
 // Tombol "Tandai Tugas Hari Ini Telah Selesai" -- hanya bisa dipakai kalau
 // seluruh titik singgah pada rute (sesi + sekolah) yang sedang ditampilkan

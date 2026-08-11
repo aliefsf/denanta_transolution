@@ -114,6 +114,30 @@ const bukaMenuLangganan = () => {
   menuTerbuka.value = false;
 };
 
+// Tombol CTA utama Hero -- 3 kondisi mengikuti status akun: belum login ->
+// "Daftar Sekarang" (ke /daftar), sudah login tapi belum ada anak
+// berlangganan aktif -> "Berlangganan Sekarang" (ke /berlangganan), sudah
+// ada anak berlangganan aktif -> "Pantau Sekarang" (langsung ke tab Pantau
+// Anak di dashboard, bukan cuma dashboard umum -- beda dari
+// bukaMenuLangganan di navbar yang sengaja berhenti di dashboard). Ketiganya
+// reaktif terhadap authStore.sudahLogin/sudahBerlangganan (di-refresh oleh
+// authStore.periksaStatusBerlangganan() setelah login/logout/pembayaran),
+// jadi label & tujuan otomatis berubah tanpa reload halaman.
+const labelTombolHero = computed(() => {
+  if (!authStore.sudahLogin) return 'Daftar Sekarang';
+  return sudahAktifBerlangganan.value ? 'Pantau Sekarang' : 'Berlangganan Sekarang';
+});
+
+const bukaTombolHero = () => {
+  if (!authStore.sudahLogin) {
+    router.push('/daftar');
+  } else if (sudahAktifBerlangganan.value) {
+    router.push({ path: '/orangtua', query: { tab: 'pantau' } });
+  } else {
+    router.push('/berlangganan');
+  }
+};
+
 // Data FAQ Accordion
 const faqList = ref([
   {
@@ -345,11 +369,13 @@ const namaPengguna = computed(() => {
           Memberikan ketenangan pikiran bagi orang tua dengan layanan antar jemput sekolah yang profesional, terpantau secara real-time, dan mengutamakan keselamatan.
         </p>
         <div class="flex flex-wrap gap-4 mt-2">
-          <router-link to="/daftar">
-            <button class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-xl px-6 py-3 transition-colors shadow-md border-0 cursor-pointer">
-              Daftar Sekarang
-            </button>
-          </router-link>
+          <button
+            type="button"
+            @click="bukaTombolHero"
+            class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-xl px-6 py-3 transition-colors shadow-md border-0 cursor-pointer"
+          >
+            {{ labelTombolHero }}
+          </button>
           <router-link to="/tentang">
             <button class="border-2 border-solid border-primary text-primary font-label-md text-label-md rounded-xl px-6 py-3 hover:bg-brand-tosca-light transition-colors bg-transparent cursor-pointer">
               Pelajari Lebih Lanjut
@@ -562,7 +588,7 @@ const namaPengguna = computed(() => {
               </li>
               <li class="flex items-center gap-2">
                 <Check class="text-primary w-5 h-5 shrink-0" />
-                <span class="font-body-md text-on-background">Notifikasi real-time via WA</span>
+                <span class="font-body-md text-on-background">Notifikasi real-time di aplikasi</span>
               </li>
               <li class="flex items-center gap-2">
                 <Check class="text-primary w-5 h-5 shrink-0" />

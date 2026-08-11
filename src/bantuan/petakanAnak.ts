@@ -35,6 +35,17 @@ export function petakanAnakTampilan(
 
   const adaKendala = perjalananAnak.some((p) => p.laporan_kendala && p.laporan_kendala.length > 0);
 
+  // Marker/lacak posisi supir HANYA boleh tampil begitu supir benar-benar
+  // memulai perjalanannya (status bukan lagi 'dijadwalkan' -- itu cuma
+  // berarti Admin sudah membuat penugasan, bukan supir sudah berangkat),
+  // dan berhenti lagi begitu sesi itu selesai ('tiba') atau dibatalkan.
+  // Sebelumnya supirId ikut terisi begitu ada baris perjalanan APAPUN
+  // statusnya, jadi marker & fallback posisi (di titik Rumah) sudah muncul
+  // padahal supir belum menekan "Mulai Bertugas" sama sekali di sisi Supir
+  // (TugasSupir.vue) -- pengguna seolah bisa "melacak" supir yang belum
+  // jalan.
+  const supirSedangBertugas = !!perjalananTerbaru && !['dijadwalkan', 'dibatalkan', 'tiba'].includes(perjalananTerbaru.status);
+
   return {
     id: anak.id,
     nama: anak.nama_lengkap,
@@ -60,7 +71,7 @@ export function petakanAnakTampilan(
     golonganDarah: anak.golongan_darah,
     alergi: anak.alergi,
     perjalananId: perjalananTerbaru?.id ?? null,
-    supirId: perjalananTerbaru?.supir_id ?? null,
+    supirId: supirSedangBertugas ? perjalananTerbaru!.supir_id : null,
     adaKendalaHariIni: adaKendala
   };
 }
