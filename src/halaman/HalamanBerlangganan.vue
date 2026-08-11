@@ -444,7 +444,9 @@ onMounted(async () => {
         );
 
     if (status.status === 'aktif' && !modeTambahAnak.value) {
-      router.push('/orangtua');
+      // replace -- akun ini sudah aktif, wizard ini bukan tujuan yang valid
+      // untuk di-back ke sini lagi.
+      router.replace('/orangtua');
       return;
     }
 
@@ -1878,17 +1880,18 @@ const unduhStruk = () => {
                 </div>
               </div>
 
-              <!-- Button redirect to parents dashboard -->
+              <!-- Button redirect to parents dashboard -- replace (bukan
+                   RouterLink push biasa) supaya tombol back tidak membawa
+                   pengguna balik ke layar sukses/wizard pembayaran ini. -->
               <div class="flex justify-center pt-2">
-                <router-link to="/orangtua" class="no-underline">
-                  <button
-                    type="button"
-                    class="inline-flex items-center gap-2 bg-[#14a38b] hover:bg-[#0f826e] text-white font-semibold py-3 px-8 rounded-[12px] transition-colors duration-200 shadow-xs border-0 cursor-pointer text-sm"
-                  >
-                    Masuk ke Halaman Monitoring Anak
-                    <ArrowRight class="w-4 h-4" />
-                  </button>
-                </router-link>
+                <button
+                  type="button"
+                  @click="router.replace('/orangtua')"
+                  class="inline-flex items-center gap-2 bg-[#14a38b] hover:bg-[#0f826e] text-white font-semibold py-3 px-8 rounded-[12px] transition-colors duration-200 shadow-xs border-0 cursor-pointer text-sm"
+                >
+                  Masuk ke Halaman Monitoring Anak
+                  <ArrowRight class="w-4 h-4" />
+                </button>
               </div>
             </div>
           </div>

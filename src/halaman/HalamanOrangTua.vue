@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../penyimpanan/authStore';
 import TataLetakOrangTua from './tataletak/TataLetakOrangTua.vue';
 import DashboardOrangTua from '../komponen/orangtua/DashboardOrangTua.vue';
@@ -16,6 +16,7 @@ import { petakanAnakTampilan } from '../bantuan/petakanAnak';
 import type { AnakTampilan } from '../tipe';
 
 const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
 const { anakAktifList, perjalananHariIniList } = useDataOrangTua();
 
@@ -50,18 +51,21 @@ const adaAnakLanggananBulanan = computed(() => anakAktifList.value.some((a) => a
 const perbaruiTabDariQuery = () => {
   if (!akunAktif.value) {
     tabAktif.value = 'pembayaran';
+    anakTerpilihId.value = null;
     return;
   }
   if (route.query.tab && typeof route.query.tab === 'string') {
     tabAktif.value = route.query.tab;
   }
+  anakTerpilihId.value = typeof route.query.anak === 'string' ? route.query.anak : null;
 };
 
-onMounted(() => {
-  perbaruiTabDariQuery();
-});
-
-// Sinkronkan tabAktif dengan route.query.tab secara reaktif melalui pemantauan fullPath
+// Sinkronkan tabAktif dengan route.query.tab secara reaktif melalui pemantauan
+// fullPath -- SATU-SATUNYA tempat yang boleh mengubah tabAktif/anakTerpilihId
+// langsung. Berlaku juga saat load pertama (immediate: true) MAUPUN saat
+// tombol back/forward perangkat/browser ditekan (Vue Router otomatis
+// memicu ulang route.fullPath saat riwayat berpindah), jadi tab yang
+// ditampilkan selalu mengikuti entri riwayat yang sedang aktif.
 watch(
   () => route.fullPath,
   () => {
@@ -82,18 +86,30 @@ watch(akunAktif, (aktif) => {
 // langsung "tabAktif = $event") -- memaksa tetap ke 'pembayaran' kalau akun
 // sedang tidak aktif, supaya tidak bisa diakali lewat event ubah-tab lama
 // yang mungkin masih dikirim komponen anak (mis. tombol dalam DashboardOrangTua).
+//
+// PENTING: pindah tab lewat router.push (query ?tab=), BUKAN sekadar
+// mengubah tabAktif.value langsung -- supaya setiap pindah tab tercatat
+// sebagai entri riwayat browser sungguhan. Tanpa ini, tombol back
+// perangkat/browser dari tab mana pun (mis. Profil) tidak akan kembali ke
+// tab sebelumnya (mis. Dashboard), melainkan langsung keluar dari /orangtua
+// ke halaman sebelum dashboard dibuka (atau keluar dari website) -- karena
+// dari sudut pandang riwayat browser, berpindah tab lewat ref biasa TIDAK
+// PERNAH menambah entri apa pun. tabAktif sendiri tidak diubah di sini;
+// perubahan sesungguhnya terjadi lewat watcher route.fullPath di atas
+// begitu navigasi ini selesai.
 const ubahTab = (tab: string) => {
-  tabAktif.value = akunAktif.value ? tab : 'pembayaran';
+  const tujuan = akunAktif.value ? tab : 'pembayaran';
+  if (tabAktif.value === tujuan && anakTerpilihId.value === null) return;
+  router.push({ path: route.path, query: { ...route.query, tab: tujuan, anak: undefined } });
 };
 
 const bukaDetailAnak = (anak: AnakTampilan) => {
   if (!akunAktif.value) return;
-  anakTerpilihId.value = anak.id;
-  tabAktif.value = 'detail-anak';
+  router.push({ path: route.path, query: { ...route.query, tab: 'detail-anak', anak: anak.id } });
 };
 
 const kembaliKePantau = () => {
-  tabAktif.value = akunAktif.value ? 'pantau' : 'pembayaran';
+  router.push({ path: route.path, query: { ...route.query, tab: akunAktif.value ? 'pantau' : 'pembayaran', anak: undefined } });
 };
 </script>
 

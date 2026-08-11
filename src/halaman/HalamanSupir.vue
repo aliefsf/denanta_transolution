@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ShieldAlert } from 'lucide-vue-next';
 import TataLetakSupir from './tataletak/TataLetakSupir.vue';
 import DashboardSupir from '../komponen/supir/DashboardSupir.vue';
@@ -12,6 +12,7 @@ import NotifikasiSupir from '../komponen/supir/NotifikasiSupir.vue';
 import { ambilStatusKehadiran, ambilStatusAktifSupir, type StatusKehadiran } from '../layanan/supirLayanan';
 
 const route = useRoute();
+const router = useRouter();
 
 // Tab Aktif: dashboard, absensi, tugas, riwayat, notifikasi, profil
 const tabAktif = ref<'dashboard' | 'absensi' | 'tugas' | 'riwayat' | 'notifikasi' | 'profil' | string>('dashboard');
@@ -25,7 +26,8 @@ const statusKehadiran = ref<StatusKehadiran>('belum_diisi');
 // ?tab= di URL) ditolak selama akun masih nonaktif.
 const akunAktif = ref(true);
 
-// Sinkronkan tabAktif dengan route.query.tab secara reaktif melalui pemantauan fullPath
+// Sinkronkan tabAktif dengan route.query.tab secara reaktif melalui pemantauan
+// fullPath -- termasuk saat tombol back/forward perangkat/browser dipakai.
 watch(
   () => route.fullPath,
   () => {
@@ -36,8 +38,13 @@ watch(
   { immediate: true }
 );
 
+// router.push (bukan ubah tabAktif.value langsung) -- supaya tiap pindah tab
+// tercatat sebagai entri riwayat browser, jadi tombol back bisa berpindah
+// antar-tab (lihat catatan panjang yang sama di HalamanOrangTua.vue).
 const ubahTab = (tab: string) => {
-  tabAktif.value = akunAktif.value ? tab : 'profil';
+  const tujuan = akunAktif.value ? tab : 'profil';
+  if (tabAktif.value === tujuan) return;
+  router.push({ path: route.path, query: { ...route.query, tab: tujuan } });
 };
 
 watch(akunAktif, (aktif) => {

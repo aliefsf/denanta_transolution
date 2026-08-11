@@ -39,18 +39,24 @@ const tanganiLogin = async () => {
 
   try {
     await authStore.login(email.value, kataSandi.value);
+    // WAJIB replace (bukan push) -- kalau push, halaman Login tetap
+    // tersimpan di riwayat browser, jadi tombol back perangkat/browser dari
+    // dashboard akan membuka lagi form Login yang sudah tidak relevan
+    // (pengguna sudah masuk). replace mengganti entri Login itu sendiri di
+    // riwayat, sehingga back dari dashboard lompat ke halaman SEBELUM Login
+    // (mis. landing page), bukan balik ke form Login.
     if (authStore.apakahAdmin) {
-      router.push('/admin');
+      router.replace('/admin');
     } else if (authStore.apakahSupir) {
-      router.push('/supir');
+      router.replace('/supir');
     } else if (authStore.apakahOrangTua) {
       // Landing page setelah login harus Dashboard Panel Pengguna, bukan
       // halaman publik '/' -- guard router (rute/index.ts) otomatis
       // mengalihkan ke /berlangganan dulu kalau akun belum punya langganan
       // aktif, jadi push ke /orangtua ini sudah benar utk kedua kondisi.
-      router.push('/orangtua');
+      router.replace('/orangtua');
     } else {
-      router.push('/');
+      router.replace('/');
     }
   } catch (err: any) {
     errorPesan.value = err.message || 'Surel atau kata sandi Anda salah';
@@ -104,7 +110,7 @@ const loginDenganGoogle = async () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       authStore.sudahLogin = true;
       authStore.peran = 'orangtua';
-      router.push('/orangtua');
+      router.replace('/orangtua');
     }
   } catch (err: any) {
     errorPesan.value = err.message || 'Gagal masuk dengan Google';

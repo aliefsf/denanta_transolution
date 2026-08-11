@@ -95,7 +95,10 @@ const tanganiDaftar = async () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       authStore.sudahLogin = true;
       authStore.peran = 'orangtua';
-      router.push(tujuanSetelahDaftar);
+      // replace, bukan push -- supaya tombol back tidak balik ke form Daftar
+      // yang sudah tidak relevan setelah akun langsung aktif (sama seperti
+      // alasan replace di Login.vue).
+      router.replace(tujuanSetelahDaftar);
       return;
     }
 
@@ -142,7 +145,7 @@ const loginDenganGoogle = async () => {
       await new Promise(resolve => setTimeout(resolve, 1500));
       authStore.sudahLogin = true;
       authStore.peran = 'orangtua';
-      router.push('/');
+      router.replace('/');
     }
   } catch (err: any) {
     errorPesan.value = err.message || 'Gagal masuk dengan Google';
