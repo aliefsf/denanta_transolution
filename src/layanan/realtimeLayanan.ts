@@ -124,6 +124,28 @@ export function pantauSupirRealtime(
 }
 
 /**
+ * Pantau kolom `sedang_bertugas`/posisi beberapa supir SEKALIGUS (bukan cuma
+ * satu seperti pantauSupirRealtime di atas) -- dipakai useDataOrangTua.ts
+ * untuk tahu begitu SALAH SATU supir yang ditugaskan ke anak akun ini
+ * menekan "Mulai Bertugas"/menyelesaikan tugasnya. PENTING: aksi itu
+ * (TugasSupir.vue -> perbaruiStatusBertugas) HANYA meng-UPDATE baris
+ * `supir`, TIDAK PERNAH menyentuh baris `perjalanan` -- jadi
+ * pantauPerjalananAnakRealtime saja tidak cukup utk membuat marker armada
+ * di Pantau Anak muncul/hilang realtime mengikuti status itu.
+ */
+export function pantauSupirBertugasRealtime(
+  supirIds: string[],
+  callback: (payload: any) => void
+) {
+  if (supirIds.length === 0) return null;
+  return gunakanRealtimeSubscription(
+    'supir',
+    `id=in.(${supirIds.join(',')})`,
+    callback
+  );
+}
+
+/**
  * Use Case 5: Pantau perubahan status perjalanan (baris `perjalanan`) untuk
  * seluruh anak milik satu akun orang tua sekaligus, supaya status yang
  * diperbarui supir di panel Supir langsung tampil di panel Orang Tua tanpa

@@ -36,15 +36,15 @@ export function petakanAnakTampilan(
   const adaKendala = perjalananAnak.some((p) => p.laporan_kendala && p.laporan_kendala.length > 0);
 
   // Marker/lacak posisi supir HANYA boleh tampil begitu supir benar-benar
-  // memulai perjalanannya (status bukan lagi 'dijadwalkan' -- itu cuma
-  // berarti Admin sudah membuat penugasan, bukan supir sudah berangkat),
-  // dan berhenti lagi begitu sesi itu selesai ('tiba') atau dibatalkan.
-  // Sebelumnya supirId ikut terisi begitu ada baris perjalanan APAPUN
-  // statusnya, jadi marker & fallback posisi (di titik Rumah) sudah muncul
-  // padahal supir belum menekan "Mulai Bertugas" sama sekali di sisi Supir
-  // (TugasSupir.vue) -- pengguna seolah bisa "melacak" supir yang belum
-  // jalan.
-  const supirSedangBertugas = !!perjalananTerbaru && !['dijadwalkan', 'dibatalkan', 'tiba'].includes(perjalananTerbaru.status);
+  // menekan "Mulai Bertugas" -- acuannya `supirSedangBertugas` (dari kolom
+  // `supir.sedang_bertugas`), SAMA PERSIS dengan yang dipakai Admin
+  // (ambilPosisiSupirAktif, adminLayanan.ts), BUKAN status kolom
+  // `perjalanan`. "Mulai Bertugas" (TugasSupir.vue) cuma meng-UPDATE baris
+  // `supir`, tidak pernah menyentuh status perjalanan -- pakai status
+  // perjalanan sebagai acuan (versi sebelumnya) membuat marker di sisi Orang
+  // Tua telat muncul dibanding Admin/Supir, kadang malah tidak pernah
+  // muncul sampai supir sempat ganti status secara manual lewat dropdown.
+  const supirSedangBertugas = !!perjalananTerbaru && perjalananTerbaru.supirSedangBertugas === true;
 
   return {
     id: anak.id,

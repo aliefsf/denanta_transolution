@@ -93,15 +93,25 @@ const legendBus = htmlLencanaIkon(svgBus, 'bg-primary', ukuranLencanaLegend);
 // ditugaskan -- lalu otomatis berpindah ke posisi asli begitu update
 // GPS/realtime pertama diterima. Disinkronkan ke KEDUA peta (kecil & penuh,
 // kalau sedang terbuka).
+// zIndexOffset besar (1000) WAJIB disetel eksplisit -- tanpa ini, Leaflet
+// menyusun urutan tumpang-tindih marker berdasarkan lintang (marker yang
+// "lebih ke selatan" otomatis dianggap lebih dekat/di atas), jadi kalau
+// posisi supir kebetulan tepat sama dengan titik Rumah/Sekolah, marker bus
+// bisa tertutup total oleh marker rumah/sekolah tergantung urutan lintang
+// -- pengguna mengira tracking berhenti padahal cuma tertimpa marker lain.
+// Marker armada harus SELALU prioritas tampil paling atas di antara marker
+// peta manapun.
+const Z_INDEX_ARMADA = 1000;
+
 function perbaruiPosisiBus(lat: number, lng: number) {
   posisiBusTerkini.value = { lat, lng };
   if (peta) {
     if (penandaBusKecil) penandaBusKecil.setLatLng([lat, lng]);
-    else penandaBusKecil = L.marker([lat, lng], { icon: ikonBus }).addTo(peta).bindPopup('<strong class="text-slate-800">Posisi Armada</strong>');
+    else penandaBusKecil = L.marker([lat, lng], { icon: ikonBus, zIndexOffset: Z_INDEX_ARMADA }).addTo(peta).bindPopup('<strong class="text-slate-800">Posisi Armada</strong>');
   }
   if (petaPenuh) {
     if (penandaBusPenuh) penandaBusPenuh.setLatLng([lat, lng]);
-    else penandaBusPenuh = L.marker([lat, lng], { icon: ikonBus }).addTo(petaPenuh).bindPopup('<strong class="text-slate-800">Posisi Armada</strong>');
+    else penandaBusPenuh = L.marker([lat, lng], { icon: ikonBus, zIndexOffset: Z_INDEX_ARMADA }).addTo(petaPenuh).bindPopup('<strong class="text-slate-800">Posisi Armada</strong>');
   }
 }
 

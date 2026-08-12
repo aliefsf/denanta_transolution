@@ -23,6 +23,7 @@ import {
   pantauNotifikasiRealtime,
   pantauLanggananAnakRealtime,
   pantauPembayaranOrangTuaRealtime,
+  pantauSupirBertugasRealtime,
   gunakanRealtimeSubscription,
   pantauLaporanKendalaRealtime
 } from '../layanan/realtimeLayanan';
@@ -62,6 +63,15 @@ let saluranPembayaran: { unsubscribe: () => void } | null = null;
 let saluranProfil: { unsubscribe: () => void } | null = null;
 let saluranLaporanKendala: { unsubscribe: () => void } | null = null;
 
+// Kanal realtime khusus kolom `supir.sedang_bertugas` (singleton) --
+// terpisah dari saluranPerjalanan di atas karena "Mulai Bertugas"
+// (TugasSupir.vue) HANYA meng-UPDATE baris `supir`, tidak pernah menyentuh
+// baris `perjalanan` -- tanpa kanal ini, marker armada di Pantau Anak tidak
+// pernah muncul realtime begitu supir menekan tombol itu, harus menunggu
+// event lain (mis. ganti status manual) baru ikut ter-refresh.
+let saluranSupirBertugas: { unsubscribe: () => void } | null = null;
+let supirIdsDipantau: string[] = [];
+
 /**
  * Mengosongkan seluruh state singleton di atas (termasuk menghentikan
  * kanal realtime yang sedang aktif) dan mengembalikan `sudahDimuat` ke
@@ -85,6 +95,9 @@ export function resetDataOrangTua() {
   saluranProfil = null;
   saluranLaporanKendala?.unsubscribe();
   saluranLaporanKendala = null;
+  saluranSupirBertugas?.unsubscribe();
+  saluranSupirBertugas = null;
+  supirIdsDipantau = [];
 
   profil.value = null;
   anakList.value = [];
@@ -162,7 +175,37 @@ export function useDataOrangTua() {
   async function muatPerjalananHariIni() {
     const anakIds = anakList.value.map((a) => a.id);
     const hasil = await jalankan(() => ambilPerjalananHariIniByAnakIds(anakIds));
-    if (hasil) perjalananHariIniList.value = hasil;
+    if (hasil) {
+      perjalananHariIniList.value = hasil;
+      mulaiRealtimeSupirBertugas();
+    }
+  }
+
+  // Mulai/segarkan langganan realtime kolom sedang_bertugas mengikuti supir
+  // yang BENAR-BENAR ditugaskan hari ini (dari perjalananHariIniList yang
+  // baru saja dimuat) -- di-resubscribe otomatis kalau set supir_id-nya
+  // berubah (mis. Admin mengganti supir penugasan).
+  function mulaiRealtimeSupirBertugas() {
+    const supirIds = Array.from(
+      new Set(perjalananHariIniList.value.map((p) => p.supir_id).filter((id): id is string => !!id))
+    );
+
+    if (supirIds.length === 0) {
+      saluranSupirBertugas?.unsubscribe();
+      saluranSupirBertugas = null;
+      supirIdsDipantau = [];
+      return;
+    }
+
+    const sudahSamaSet =
+      supirIds.length === supirIdsDipantau.length && supirIds.every((id) => supirIdsDipantau.includes(id));
+    if (saluranSupirBertugas && sudahSamaSet) return;
+
+    saluranSupirBertugas?.unsubscribe();
+    supirIdsDipantau = supirIds;
+    saluranSupirBertugas = pantauSupirBertugasRealtime(supirIds, () => {
+      muatPerjalananHariIni();
+    });
   }
 
   // Mulai/segarkan langganan realtime status perjalanan mengikuti anak_id
@@ -272,6 +315,9 @@ export function useDataOrangTua() {
     saluranProfil = null;
     saluranLaporanKendala?.unsubscribe();
     saluranLaporanKendala = null;
+    saluranSupirBertugas?.unsubscribe();
+    saluranSupirBertugas = null;
+    supirIdsDipantau = [];
   }
 
   async function muatNotifikasi() {

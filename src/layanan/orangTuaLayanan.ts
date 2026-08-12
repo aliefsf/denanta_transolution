@@ -253,6 +253,15 @@ export interface PerjalananDenganSupir extends PerjalananRow {
   namaSupir: string | null;
   kontakSupir: string | null;
   fotoSupir?: string | null;
+  // Sumber kebenaran TUNGGAL utk kemunculan marker armada di peta Pantau
+  // Anak -- SENGAJA disamakan persis dengan yang dipakai Admin
+  // (ambilPosisiSupirAktif, adminLayanan.ts: `supir.sedang_bertugas`),
+  // BUKAN status kolom `perjalanan`. "Mulai Bertugas" (TugasSupir.vue)
+  // cuma meng-UPDATE baris `supir` ini, tidak pernah mengubah status
+  // perjalanan sama sekali -- pakai acuan lain (mis. status != 'dijadwalkan')
+  // membuat sisi Orang Tua "telat" ketimbang Admin/Supir, atau malah tidak
+  // pernah muncul sampai supir sempat mengubah status secara manual.
+  supirSedangBertugas: boolean;
   laporan_kendala?: LaporanKendalaRow[];
 }
 
@@ -263,14 +272,15 @@ async function lengkapiNamaSupir(perjalananList: PerjalananRow[]): Promise<Perja
   );
 
   if (supirIds.length === 0) {
-    return perjalananList.map((p) => ({ ...p, namaSupir: null, kontakSupir: null, fotoSupir: null }));
+    return perjalananList.map((p) => ({ ...p, namaSupir: null, kontakSupir: null, fotoSupir: null, supirSedangBertugas: false }));
   }
 
-  const { data: penggunaSupir, error } = await client
-    .from('pengguna')
-    .select('id, nama_lengkap, nomor_telepon, foto_profil')
-    .in('id', supirIds);
-  if (error) throw error;
+  const [{ data: penggunaSupir, error: errPengguna }, { data: supirData, error: errSupir }] = await Promise.all([
+    client.from('pengguna').select('id, nama_lengkap, nomor_telepon, foto_profil').in('id', supirIds),
+    client.from('supir').select('id, sedang_bertugas').in('id', supirIds)
+  ]);
+  if (errPengguna) throw errPengguna;
+  if (errSupir) throw errSupir;
 
   const petaSupir = new Map(
     (penggunaSupir ?? []).map((p: any) => [
@@ -278,12 +288,14 @@ async function lengkapiNamaSupir(perjalananList: PerjalananRow[]): Promise<Perja
       { nama: p.nama_lengkap, telepon: p.nomor_telepon, foto: p.foto_profil }
     ])
   );
+  const petaBertugas = new Map((supirData ?? []).map((s: any) => [s.id, !!s.sedang_bertugas]));
 
   return perjalananList.map((p) => ({
     ...p,
     namaSupir: p.supir_id ? petaSupir.get(p.supir_id)?.nama ?? null : null,
     kontakSupir: p.supir_id ? petaSupir.get(p.supir_id)?.telepon ?? null : null,
-    fotoSupir: p.supir_id ? petaSupir.get(p.supir_id)?.foto ?? null : null
+    fotoSupir: p.supir_id ? petaSupir.get(p.supir_id)?.foto ?? null : null,
+    supirSedangBertugas: p.supir_id ? petaBertugas.get(p.supir_id) ?? false : false
   }));
 }
 
