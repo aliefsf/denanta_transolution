@@ -87,15 +87,24 @@ const popupSupir = (supir: DriverPosition, nomor: number, warna: string) => `
   </div>
 `;
 
-const buatDestIcon = (warna: string) => L.divIcon({
+// Warna tujuan SENGAJA tetap satu warna tetap (rose), TIDAK mengikuti
+// warnaUntukSupir seperti marker/polyline -- kalau tujuan ikut memakai
+// warna supir yang sama, begitu supir sudah dekat/hampir sampai (koordinat
+// hampir berhimpit dengan tujuan), pin tujuan yang lebih kecil jadi
+// nyaris tak kasat mata karena warnanya sama & tertimpa marker supir yang
+// z-index-nya sengaja lebih tinggi (lihat zIndexOffset: 1000 di atas) --
+// dengan warna kontras tetap (rose vs warna supir apa pun), sisa pin yang
+// masih terlihat di baliknya tetap jelas dikenali sebagai marker tujuan.
+const buatDestIcon = () => L.divIcon({
   html: `
-    <div class="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center shadow-md text-white" style="background:${warna}">
+    <div class="w-6 h-6 rounded-full bg-rose-600 border-2 border-white flex items-center justify-center shadow-md text-white">
       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
     </div>
   `,
   className: '',
   iconSize: [24, 24],
-  iconAnchor: [12, 12]
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -30]
 });
 
 const renderMarkers = () => {
@@ -191,7 +200,7 @@ const renderMarkers = () => {
       if (destMarkers[supir.id]) {
         destMarkers[supir.id].setLatLng([supir.destLat, supir.destLng]);
       } else {
-        destMarkers[supir.id] = L.marker([supir.destLat, supir.destLng], { icon: buatDestIcon(warna) })
+        destMarkers[supir.id] = L.marker([supir.destLat, supir.destLng], { icon: buatDestIcon(), zIndexOffset: 500 })
           .addTo(mapInstance)
           .bindPopup(`<strong>Tujuan ${supir.nama}:</strong> ${supir.sekolahTujuan || 'Lokasi Tujuan'}`);
       }
