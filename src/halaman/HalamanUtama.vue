@@ -36,10 +36,10 @@ onUnmounted(() => {
   window.removeEventListener('scroll', tanganiScroll);
 });
 // Sedikit lebih pendek dari tinggi background hero mobile (lihat
-// min-h-[540px] pada <section> Hero) supaya transisi ke solid terjadi
+// min-h-[580px] pada <section> Hero) supaya transisi ke solid terjadi
 // SEBELUM tepi bawah gambar (yang sudah memudar ke warna background lewat
 // overlay gradien) sempat terlihat berbenturan dengan navbar solid.
-const navMasihTransparan = computed(() => scrollY.value < 440);
+const navMasihTransparan = computed(() => scrollY.value < 470);
 
 // Efek "pill" aktif pada menu navbar mengikuti rute yang sedang dibuka --
 // dinamis lewat useRoute() (bukan ditulis statis per halaman) supaya kalau
@@ -231,22 +231,32 @@ const namaPengguna = computed(() => {
          dari hero -- navbar & hero jadi terlihat menyatu dalam satu
          background yang sama, bukan ada jeda putih di antara keduanya.
          Tingginya = tinggi navbar (pt-24 = 6rem) + tinggi hero mobile
-         (min-h-[540px] pada <section> Hero di bawah). -->
-    <div class="md:hidden absolute top-0 left-0 right-0 h-[calc(6rem+540px)] z-0 bg-black">
+         (min-h-[580px] pada <section> Hero di bawah).
+
+         transform-gpu (translateZ(0)) WAJIB di sini DAN di kedua lapisan
+         overlay di bawah -- tanpa ini, begitu sidebar dibuka (pembungkus
+         terluar di atas ikut mendapat transform:translateX utk efek
+         geser), browser bisa salah menggabungkan/"meratakan" layer
+         overlay semi-transparan ini ke compositing layer milik ancestor
+         yang sama, membuatnya sekilas hilang/lebih terang (gambar latar
+         terlihat polos tanpa overlay gelap) -- transform-gpu memaksa
+         overlay ini jadi compositing layer-nya sendiri yang independen,
+         jadi tidak ikut "reset" saat ancestor-nya berubah transform. -->
+    <div class="md:hidden absolute top-0 left-0 right-0 h-[calc(6rem+580px)] z-0 bg-black transform-gpu">
       <Transition name="fade-hero">
         <img
           :key="indeksGambarHero"
           :src="gambarHero[indeksGambarHero]"
           alt="Denanta TranSolution"
-          class="absolute inset-0 w-full h-full object-cover"
+          class="absolute inset-0 w-full h-full object-cover transform-gpu"
         />
       </Transition>
       <!-- Overlay MERATA (bukan cuma menggelapkan bagian bawah) supaya
            tingkat gelap navbar & hero konsisten -- lapisan gelap flat di
            atas seluruh gambar, ditambah gradien halus di tepi bawah saja
            utk transisi mulus ke warna background section berikutnya. -->
-      <div class="absolute inset-0 bg-black/45"></div>
-      <div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background"></div>
+      <div class="absolute inset-0 bg-black/45 transform-gpu"></div>
+      <div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background transform-gpu"></div>
     </div>
 
     <!-- TopNavBar -->
@@ -444,10 +454,19 @@ const namaPengguna = computed(() => {
     </div>
 
     <!-- Hero Section -->
-    <section class="relative overflow-hidden md:overflow-visible min-h-[540px] md:min-h-0 flex items-center md:block">
+    <section class="relative overflow-hidden md:overflow-visible min-h-[580px] md:min-h-0 flex items-center md:block">
       <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-[80px] flex flex-col md:flex-row items-center gap-gutter relative z-10 w-full">
       <div class="md:w-1/2 flex flex-col gap-6 z-10 text-left">
-        <h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-display-lg md:text-display-lg text-white md:text-on-background tracking-tight leading-tight">
+        <!-- Ukuran mobile dinaikkan jadi elemen utama hero (sebelumnya
+             cuma 24px/headline-lg-mobile, kalah menonjol dibanding foto
+             latar) -- pakai clamp() lewat arbitrary value (bukan mengubah
+             token headline-lg-mobile di tailwind.config.js, supaya
+             HalamanTentang.vue yang juga memakai token itu tidak ikut
+             berubah) supaya tetap responsif mengikuti lebar layar, dibatasi
+             maksimal 44px (di bawah ukuran desktop 48px). text-shadow
+             menjaga keterbacaan di atas foto. max-w-[90%] mencegah judul
+             mepet ke tepi kanan layar. -->
+        <h1 class="font-headline-lg-mobile text-[clamp(1.9rem,7vw,2.75rem)] leading-[1.15] md:font-display-lg md:text-display-lg md:leading-[56px] text-white md:text-on-background tracking-tight max-w-[90%] md:max-w-none [text-shadow:0_2px_10px_rgba(0,0,0,0.35)] md:[text-shadow:none]">
           Pantau Perjalanan Anak dengan <span class="bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent">Aman &amp; Nyata</span> di Padang.
         </h1>
         <p class="font-body-lg text-body-lg text-white/90 md:text-on-surface-variant max-w-lg leading-relaxed">
