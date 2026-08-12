@@ -233,9 +233,15 @@ const namaPengguna = computed(() => {
           </button>
 
           <!-- Kondisi BELUM LOGIN -->
-          <div v-if="!isAuthenticated" class="flex items-center">
-            <router-link 
-              to="/register" 
+          <div v-if="!isAuthenticated" class="flex items-center gap-2">
+            <router-link
+              to="/login"
+              class="text-on-surface-variant hover:text-primary font-label-md text-label-md rounded-full px-4 py-2.5 transition-colors cursor-pointer border-0 font-semibold inline-block bg-transparent"
+            >
+              Masuk
+            </router-link>
+            <router-link
+              to="/register"
               class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-full px-5 py-2.5 transition-colors shadow-sm cursor-pointer border-0 font-semibold inline-block"
             >
               Daftar
@@ -371,12 +377,33 @@ const namaPengguna = computed(() => {
     </div>
 
     <!-- Hero Section -->
-    <section class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-[80px] flex flex-col md:flex-row items-center gap-gutter relative z-10">
+    <section class="relative overflow-hidden md:overflow-visible min-h-[540px] md:min-h-0 flex items-center md:block">
+      <!-- Background image (HANYA mobile/md:hidden) -- memakai carousel &
+           transisi fade yang SAMA PERSIS dengan galeri desktop di bawah
+           (gambarHero/indeksGambarHero, satu sumber data), bukan aset
+           terpisah. Di layar sempit galeri sisi-kanan tidak muat berdampingan
+           dengan teks, jadi gambarnya dijadikan latar belakang penuh
+           (bg-cover) dengan overlay gradien gelap supaya judul tetap
+           terbaca -- gantinya, kotak galeri terpisah di bawah disembunyikan
+           total di mobile (hidden md:block) supaya tidak dobel/perlu scroll. -->
+      <div class="md:hidden absolute inset-0 z-0">
+        <Transition name="fade-hero">
+          <img
+            :key="indeksGambarHero"
+            :src="gambarHero[indeksGambarHero]"
+            alt="Denanta TranSolution"
+            class="absolute inset-0 w-full h-full object-cover"
+          />
+        </Transition>
+        <div class="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-background"></div>
+      </div>
+
+      <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-[80px] flex flex-col md:flex-row items-center gap-gutter relative z-10 w-full">
       <div class="md:w-1/2 flex flex-col gap-6 z-10 text-left">
-        <h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-display-lg md:text-display-lg text-on-background tracking-tight leading-tight">
+        <h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-display-lg md:text-display-lg text-white md:text-on-background tracking-tight leading-tight">
           Pantau Perjalanan Anak dengan <span class="bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent">Aman &amp; Nyata</span> di Padang.
         </h1>
-        <p class="font-body-lg text-body-lg text-on-surface-variant max-w-lg leading-relaxed">
+        <p class="font-body-lg text-body-lg text-white/90 md:text-on-surface-variant max-w-lg leading-relaxed">
           Memberikan ketenangan pikiran bagi orang tua dengan layanan antar jemput sekolah yang profesional, terpantau secara real-time, dan mengutamakan keselamatan.
         </p>
         <div class="flex flex-wrap gap-4 mt-2">
@@ -388,13 +415,13 @@ const namaPengguna = computed(() => {
             {{ labelTombolHero }}
           </button>
           <router-link to="/tentang">
-            <button class="border-2 border-solid border-primary text-primary font-label-md text-label-md rounded-xl px-6 py-3 hover:bg-brand-tosca-light transition-colors bg-transparent cursor-pointer">
+            <button class="border-2 border-solid border-primary text-primary md:text-primary bg-white/90 md:bg-transparent font-label-md text-label-md rounded-xl px-6 py-3 hover:bg-brand-tosca-light transition-colors cursor-pointer">
               Pelajari Lebih Lanjut
             </button>
           </router-link>
         </div>
       </div>
-      <div class="md:w-1/2 relative">
+      <div class="hidden md:block md:w-1/2 relative">
         <div class="absolute inset-0 bg-primary-container rounded-full opacity-[0.15] blur-xl transform scale-110"></div>
         <!-- Bingkai gradien sebagai "border" -- padding pada wrapper luar
              menyisakan celah warna gradien primary di sekeliling kotak
@@ -422,6 +449,7 @@ const namaPengguna = computed(() => {
             </Transition>
           </div>
         </div>
+      </div>
       </div>
     </section>
 
