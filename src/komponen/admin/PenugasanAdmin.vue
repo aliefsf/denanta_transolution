@@ -204,13 +204,19 @@ const bukaDetailPenugasan = (penugasan: PenugasanHariIni) => {
   modalDetailTampil.value = true;
 };
 
-// Siswa terdaftar dikelompokkan per sekolah (bukan satu daftar rata) supaya
-// asal sekolah tiap anak lebih jelas -- urutan grup mengikuti sekolahList
-// (urutan penugasan dibuat).
+// Anak dengan pengajuan_perubahan_jadwal 'disetujui' (waktuKhusus terisi)
+// WAJIB dipisah dari "Tugas Utama" -- waktu jemput/antarnya beda, tidak
+// boleh tercampur dalam satu kelompok rute dengan anak berjadwal normal
+// (lihat catatan lengkap di TugasAnakSupir.waktuKhusus, supirLayanan.ts).
+const anakTugasUtama = computed(() => (penugasanDetail.value?.anakList ?? []).filter((a) => !a.waktuKhusus));
+const anakPerubahanJadwal = computed(() => (penugasanDetail.value?.anakList ?? []).filter((a) => a.waktuKhusus));
+
+// Siswa Tugas Utama dikelompokkan per sekolah (bukan satu daftar rata)
+// supaya asal sekolah tiap anak lebih jelas -- urutan grup mengikuti
+// sekolahList (urutan penugasan dibuat).
 const anakPerSekolahDetail = computed(() => {
-  if (!penugasanDetail.value) return [];
-  const peta = new Map<string, { perjalananId: string; nama: string; alamatDiperbarui: boolean }[]>();
-  for (const anak of penugasanDetail.value.anakList) {
+  const peta = new Map<string, { perjalananId: string; nama: string; alamatDiperbarui: boolean; waktuKhusus: string | null }[]>();
+  for (const anak of anakTugasUtama.value) {
     if (!peta.has(anak.sekolah)) peta.set(anak.sekolah, []);
     peta.get(anak.sekolah)!.push(anak);
   }
@@ -524,7 +530,7 @@ const buatPenugasan = async () => {
 
         <div>
           <span class="text-on-surface-variant font-bold uppercase text-[9px]">
-            Siswa Terdaftar ({{ penugasanDetail.anakList.length }} Anak):
+            Tugas Utama -- Siswa Terdaftar ({{ anakTugasUtama.length }} Anak):
           </span>
           <div class="mt-1 max-h-64 overflow-y-auto space-y-3 border border-outline-variant/20 rounded-lg p-2 bg-surface-container">
             <div v-for="grup in anakPerSekolahDetail" :key="grup.sekolah">
@@ -550,6 +556,36 @@ const buatPenugasan = async () => {
                   </span>
                 </li>
               </ul>
+            </div>
+            <p v-if="anakTugasUtama.length === 0" class="text-[10px] text-on-surface-variant italic text-center py-2">
+              Tidak ada siswa dengan jadwal normal pada penugasan ini.
+            </p>
+          </div>
+        </div>
+
+        <!-- Anak dengan perubahan jadwal 'disetujui' -- SENGAJA dipisah total
+             dari daftar Tugas Utama di atas (bukan cuma ditandai), supaya
+             Admin & Supir tidak keliru mencampur waktu jemput/antar mereka
+             dengan anak berjadwal normal. -->
+        <div v-if="anakPerubahanJadwal.length > 0">
+          <span class="text-amber-700 font-bold uppercase text-[9px] flex items-center gap-1">
+            <AlertTriangle class="w-3 h-3" />
+            Perubahan Jadwal -- Terdapat {{ anakPerubahanJadwal.length }} Anak
+          </span>
+          <div class="mt-1 space-y-2">
+            <div
+              v-for="anak in anakPerubahanJadwal"
+              :key="anak.perjalananId"
+              class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-on-surface"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-xs">{{ anak.nama }}</span>
+                <span class="text-[9px] font-bold text-amber-700 uppercase">Jadwal Baru: {{ anak.waktuKhusus }}</span>
+              </div>
+              <p class="text-[10px] text-on-surface-variant mt-0.5">{{ anak.sekolah }}</p>
+              <p class="text-[10px] text-amber-700 mt-1">
+                Catatan: anak harus dijemput/diantar pukul {{ anak.waktuKhusus }} sesuai permintaan perubahan jadwal orang tua -- jangan digabung dengan rute Tugas Utama.
+              </p>
             </div>
           </div>
         </div>

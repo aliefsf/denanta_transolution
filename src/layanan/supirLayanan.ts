@@ -273,6 +273,13 @@ export interface TugasAnakSupir {
   // dibuat (lihat perbaruiAlamatAnak, orangTuaLayanan.ts) -- penugasan tetap
   // sama, cuma titik lokasinya perlu diperhatikan (sudah beda dari sebelumnya).
   alamatDiperbarui: boolean;
+  // Terisi ("HH:MM") kalau anak ini punya pengajuan_perubahan_jadwal yang
+  // 'disetujui' untuk tanggal & sesi (pagi->pergi, sore->pulang) yang sama --
+  // dipakai memisahkan anak ini dari rute/estimasi waktu utama (mereka
+  // dijemput/diantar di jam BERBEDA, tidak boleh dicampur dalam satu
+  // perhitungan rute optimal bersama anak berjadwal normal). null = jadwal
+  // normal, ikut rute utama seperti biasa.
+  waktuKhusus: string | null;
 }
 
 const DUA_JAM_MS = 2 * 60 * 60 * 1000;
@@ -357,6 +364,26 @@ export async function ambilTugasHariIni(tanggal: string): Promise<TugasAnakSupir
   const anakIds = Array.from(new Set(anakAktifList.map((p: any) => p.anak.id)));
   const anakIdBerlangganan = await ambilAnakIdBerlanggananAktif(client, anakIds, tanggal);
 
+  // Anak dengan pengajuan_perubahan_jadwal 'disetujui' utk tanggal & sesi
+  // yang sama HARUS dipisahkan dari rute utama (waktu jemput/antarnya
+  // beda, tidak boleh ikut dihitung dalam satu rute optimal bersama anak
+  // berjadwal normal) -- lihat waktuKhusus di TugasAnakSupir. jenis_perubahan
+  // 'pergi' <-> sesi 'pagi', 'pulang' <-> sesi 'sore' (sama seperti
+  // ajukanPerubahanJadwal, orangTuaLayanan.ts).
+  const waktuKhususByAnakSesi = new Map<string, string>();
+  if (anakIds.length > 0) {
+    const { data: pengajuanList } = await client
+      .from('pengajuan_perubahan_jadwal')
+      .select('anak_id, jenis_perubahan, waktu_baru')
+      .in('anak_id', anakIds)
+      .eq('tanggal', tanggal)
+      .eq('status', 'disetujui');
+    for (const pj of (pengajuanList ?? []) as any[]) {
+      const sesi = pj.jenis_perubahan === 'pergi' ? 'pagi' : 'sore';
+      waktuKhususByAnakSesi.set(`${pj.anak_id}|${sesi}`, String(pj.waktu_baru).slice(0, 5));
+    }
+  }
+
   return anakAktifList
     .filter((p: any) => anakIdBerlangganan.has(p.anak.id))
     .map((p: any) => ({
@@ -377,7 +404,8 @@ export async function ambilTugasHariIni(tanggal: string): Promise<TugasAnakSupir
       lintangAntar: p.anak.lintang_antar,
       bujurAntar: p.anak.bujur_antar,
       diselesaikanPada: p.diselesaikan_pada,
-      alamatDiperbarui: !!p.alamat_diperbarui_pada
+      alamatDiperbarui: !!p.alamat_diperbarui_pada,
+      waktuKhusus: waktuKhususByAnakSesi.get(`${p.anak.id}|${p.jenis_perjalanan}`) ?? null
     }));
 }
 

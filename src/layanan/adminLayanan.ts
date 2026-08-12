@@ -836,7 +836,11 @@ export interface PenugasanHariIni {
   // yang menandai perjalanan.alamat_diperbarui_pada) -- anak TETAP di
   // penugasan yang sama (beda dari perubahan waktu/hari yang membatalkan
   // penugasan), tapi Admin perlu tahu titik lokasinya sudah berubah.
-  anakList: { perjalananId: string; nama: string; sekolah: string; alamatDiperbarui: boolean }[];
+  // waktuKhusus: terisi ("HH:MM") kalau anak punya pengajuan_perubahan_jadwal
+  // 'disetujui' untuk tanggal & sesi ini -- HARUS ditampilkan Admin sebagai
+  // kelompok terpisah dari "Tugas Utama", lihat catatan lengkap di
+  // ambilPenugasanHariIni() & TugasAnakSupir.waktuKhusus (supirLayanan.ts).
+  anakList: { perjalananId: string; nama: string; sekolah: string; alamatDiperbarui: boolean; waktuKhusus: string | null }[];
 }
 
 /**
@@ -1035,6 +1039,23 @@ export async function ambilPenugasanHariIni(tanggal: string): Promise<PenugasanH
   const anakIdBerlangganan = await ambilAnakIdBerlanggananAktif(client, anakIds, tanggal);
   const data = anakAktifMentah.filter((p: any) => anakIdBerlangganan.has(p.anak_id));
 
+  // Sama seperti ambilTugasHariIni() (supirLayanan.ts) -- anak dengan
+  // pengajuan_perubahan_jadwal 'disetujui' utk tanggal & sesi yang sama
+  // WAJIB ditandai supaya Admin bisa memisahkannya dari "Tugas Utama".
+  const waktuKhususByAnakSesi = new Map<string, string>();
+  if (anakIds.length > 0) {
+    const { data: pengajuanList } = await client
+      .from('pengajuan_perubahan_jadwal')
+      .select('anak_id, jenis_perubahan, waktu_baru')
+      .in('anak_id', anakIds)
+      .eq('tanggal', tanggal)
+      .eq('status', 'disetujui');
+    for (const pj of (pengajuanList ?? []) as any[]) {
+      const sesi = pj.jenis_perubahan === 'pergi' ? 'pagi' : 'sore';
+      waktuKhususByAnakSesi.set(`${pj.anak_id}|${sesi}`, String(pj.waktu_baru).slice(0, 5));
+    }
+  }
+
   const supirIds = Array.from(new Set((data ?? []).map((p: any) => p.supir_id)));
   const namaSupirById = new Map<string, string>();
   if (supirIds.length > 0) {
@@ -1066,7 +1087,8 @@ export async function ambilPenugasanHariIni(tanggal: string): Promise<PenugasanH
       perjalananId: p.id,
       nama: p.anak?.nama_lengkap ?? '-',
       sekolah: namaSekolah,
-      alamatDiperbarui: !!p.alamat_diperbarui_pada
+      alamatDiperbarui: !!p.alamat_diperbarui_pada,
+      waktuKhusus: waktuKhususByAnakSesi.get(`${p.anak_id}|${p.jenis_perjalanan}`) ?? null
     });
     if (namaSekolah !== '-') sekolahSetByKey.get(key)!.add(namaSekolah);
   }

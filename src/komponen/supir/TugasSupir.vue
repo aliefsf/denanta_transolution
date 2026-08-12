@@ -194,9 +194,21 @@ watch(daftarSekolahSesi, (list) => {
   }
 }, { immediate: true });
 
-// Filtered tasks based on selections
+// Filtered tasks based on selections -- anak dengan waktuKhusus (pengajuan
+// perubahan jadwal 'disetujui' utk sesi ini) DIKECUALIKAN dari sini, supaya
+// tidak pernah ikut dihitung dalam rute optimal/estimasi waktu bersama
+// anak berjadwal normal (waktu jemput/antar mereka beda) -- lihat
+// tugasPerubahanJadwalSesi di bawah untuk daftar terpisahnya.
 const tugasTerfilter = computed(() => {
-  return daftarTugas.value.filter(a => a.jenisPerjalanan === sesiTerpilih.value && a.sekolah === sekolahTerpilih.value);
+  return daftarTugas.value.filter(a => a.jenisPerjalanan === sesiTerpilih.value && a.sekolah === sekolahTerpilih.value && !a.waktuKhusus);
+});
+
+// Anak dengan perubahan jadwal 'disetujui' pada sesi yang sedang dipilih --
+// SENGAJA lintas-sekolah (tidak ikut filter dropdown sekolah), ditampilkan
+// sebagai daftar terpisah total, TIDAK PERNAH masuk ke tugasTerfilter/rute
+// utama di atas.
+const tugasPerubahanJadwalSesi = computed(() => {
+  return daftarTugas.value.filter(a => a.jenisPerjalanan === sesiTerpilih.value && a.waktuKhusus);
 });
 
 const sekolahAktif = computed(() => tugasTerfilter.value[0] ?? null);
@@ -630,6 +642,39 @@ const konfirmasiSelesaikanRute = async () => {
           </div>
         </div>
 
+      </div>
+
+      <!-- Perubahan Jadwal -- SENGAJA dipisah total dari rute utama di atas
+           (bukan cuma ditandai): anak di sini punya jam jemput/antar
+           BERBEDA (pengajuan_perubahan_jadwal 'disetujui'), tidak boleh
+           ikut masuk perhitungan rute optimal/estimasi waktu bersama anak
+           berjadwal normal. -->
+      <div v-if="tugasPerubahanJadwalSesi.length > 0" class="bg-amber-50 border border-amber-200 rounded-2xl p-5 space-y-3">
+        <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+          <AlertTriangle class="w-4 h-4" />
+          Perubahan Jadwal -- Terdapat {{ tugasPerubahanJadwalSesi.length }} Anak
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            v-for="anak in tugasPerubahanJadwalSesi"
+            :key="anak.perjalananId"
+            class="bg-white border border-amber-300 rounded-xl p-4 space-y-1.5 text-xs"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-bold text-sm text-on-surface">{{ anak.nama }}</span>
+              <span class="flex-shrink-0 text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                Jadwal Baru: {{ anak.waktuKhusus }}
+              </span>
+            </div>
+            <p class="text-[11px] text-on-surface-variant">{{ anak.sekolah }} &middot; {{ anak.kelas }}</p>
+            <p class="text-[11px] text-on-surface-variant">
+              {{ anak.jenisPerjalanan === 'pagi' ? anak.alamatJemput : anak.alamatAntar }}
+            </p>
+            <p class="text-[11px] text-amber-700 font-semibold pt-1.5 border-t border-amber-100">
+              Catatan Perubahan: Orang tua melakukan perubahan jadwal. Harap melakukan {{ anak.jenisPerjalanan === 'pagi' ? 'penjemputan' : 'pengantaran' }} pada pukul {{ anak.waktuKhusus }} WIB.
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- Student Cards List -->
