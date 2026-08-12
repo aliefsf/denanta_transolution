@@ -20,6 +20,27 @@ const { isAuthenticated, userProfile } = useAuth();
 const menuTerbuka = ref(false);
 const adaNotifikasi = ref(true);
 
+// Navbar transparan MENYATU dengan background hero -- HANYA berlaku di
+// mobile (di-override balik solid lewat class md: di template) dan HANYA
+// selagi scroll masih berada di area hero (background image + overlay
+// gelap-nya cuma setinggi hero, lihat tinggiHeroMobile di bawah). Begitu
+// discroll melewati hero, latar di baliknya berubah putih (section
+// Keunggulan dst) -- navbar WAJIB balik solid di titik itu juga, kalau
+// tidak logo/ikon putih jadi tidak kebaca di atas latar putih.
+const scrollY = ref(0);
+const tanganiScroll = () => { scrollY.value = window.scrollY; };
+onMounted(() => {
+  window.addEventListener('scroll', tanganiScroll, { passive: true });
+});
+onUnmounted(() => {
+  window.removeEventListener('scroll', tanganiScroll);
+});
+// Sedikit lebih pendek dari tinggi background hero mobile (lihat
+// min-h-[540px] pada <section> Hero) supaya transisi ke solid terjadi
+// SEBELUM tepi bawah gambar (yang sudah memudar ke warna background lewat
+// overlay gradien) sempat terlihat berbenturan dengan navbar solid.
+const navMasihTransparan = computed(() => scrollY.value < 440);
+
 // Efek "pill" aktif pada menu navbar mengikuti rute yang sedang dibuka --
 // dinamis lewat useRoute() (bukan ditulis statis per halaman) supaya kalau
 // suatu saat menu ini ditambah/route berubah, status aktifnya tidak perlu
@@ -198,12 +219,53 @@ const namaPengguna = computed(() => {
     :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }"
   >
 
+    <!-- Background image header (HANYA mobile/md:hidden) -- memakai carousel
+         & transisi fade yang SAMA PERSIS dengan galeri desktop di Hero
+         Section (gambarHero/indeksGambarHero, satu sumber data, bukan aset
+         terpisah). Sengaja diletakkan di LUAR <section> Hero (top:0 relatif
+         ke pembungkus terluar ini, mengabaikan pt-24 miliknya -- itulah
+         kenapa div ini WAJIB anak langsung dari pembungkus ber-position:
+         relative di atas, bukan dari <section> yang mulai SETELAH jarak
+         pt-24) supaya areanya mencakup navbar (yang fixed, dibuat
+         transparan lewat navMasihTransparan) sekaligus, bukan cuma mulai
+         dari hero -- navbar & hero jadi terlihat menyatu dalam satu
+         background yang sama, bukan ada jeda putih di antara keduanya.
+         Tingginya = tinggi navbar (pt-24 = 6rem) + tinggi hero mobile
+         (min-h-[540px] pada <section> Hero di bawah). -->
+    <div class="md:hidden absolute top-0 left-0 right-0 h-[calc(6rem+540px)] z-0 bg-black">
+      <Transition name="fade-hero">
+        <img
+          :key="indeksGambarHero"
+          :src="gambarHero[indeksGambarHero]"
+          alt="Denanta TranSolution"
+          class="absolute inset-0 w-full h-full object-cover"
+        />
+      </Transition>
+      <!-- Overlay MERATA (bukan cuma menggelapkan bagian bawah) supaya
+           tingkat gelap navbar & hero konsisten -- lapisan gelap flat di
+           atas seluruh gambar, ditambah gradien halus di tepi bawah saja
+           utk transisi mulus ke warna background section berikutnya. -->
+      <div class="absolute inset-0 bg-black/45"></div>
+      <div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background"></div>
+    </div>
+
     <!-- TopNavBar -->
-    <nav class="bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant/30 shadow-sm fixed top-0 left-0 w-full z-50">
+    <nav
+      class="fixed top-0 left-0 w-full z-50 transition-colors duration-300 md:bg-surface-container-lowest md:dark:bg-surface-dim md:border-b md:border-outline-variant/30 md:shadow-sm"
+      :class="navMasihTransparan ? 'bg-transparent border-b border-transparent' : 'bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant/30 shadow-sm'"
+    >
       <div class="flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-[1280px] mx-auto">
-        <!-- Logo -->
+        <!-- Logo -- filter invert MENGGANTI logo jadi putih selagi navbar
+             transparan di atas foto (tidak ada aset logo putih terpisah,
+             lihat catatan di script) -- otomatis balik warna asli begitu
+             navbar solid/di desktop. -->
         <div class="flex items-center cursor-pointer" @click="navigasiKe('/')">
-          <img src="/logo-denanta.png" alt="Denanta TranSolution" class="h-14 md:h-24 w-auto" />
+          <img
+            src="/logo-denanta.png"
+            alt="Denanta TranSolution"
+            class="h-14 md:h-24 w-auto transition-[filter] duration-300 md:!filter-none"
+            :class="navMasihTransparan ? 'brightness-0 invert' : ''"
+          />
         </div>
         
         <!-- Desktop Menu -->
@@ -275,13 +337,18 @@ const namaPengguna = computed(() => {
             v-if="sudahAktifBerlangganan"
             type="button"
             @click="bukaNotifikasi"
-            class="relative cursor-pointer text-slate-500 hover:text-primary transition-colors p-2 bg-transparent border-0"
+            class="relative cursor-pointer hover:text-primary transition-colors p-2 bg-transparent border-0"
+            :class="navMasihTransparan ? 'text-white' : 'text-slate-500'"
             title="Lihat Notifikasi"
           >
             <Bell class="w-5 h-5" />
             <span v-if="adaNotifikasi" class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-error"></span>
           </button>
-          <button @click="toggleMenu" class="text-on-surface-variant hover:text-primary p-2 cursor-pointer border-0 bg-transparent">
+          <button
+            @click="toggleMenu"
+            class="hover:text-primary p-2 cursor-pointer border-0 bg-transparent transition-colors"
+            :class="navMasihTransparan ? 'text-white' : 'text-on-surface-variant'"
+          >
             <Menu class="w-6 h-6" />
           </button>
         </div>
@@ -378,26 +445,6 @@ const namaPengguna = computed(() => {
 
     <!-- Hero Section -->
     <section class="relative overflow-hidden md:overflow-visible min-h-[540px] md:min-h-0 flex items-center md:block">
-      <!-- Background image (HANYA mobile/md:hidden) -- memakai carousel &
-           transisi fade yang SAMA PERSIS dengan galeri desktop di bawah
-           (gambarHero/indeksGambarHero, satu sumber data), bukan aset
-           terpisah. Di layar sempit galeri sisi-kanan tidak muat berdampingan
-           dengan teks, jadi gambarnya dijadikan latar belakang penuh
-           (bg-cover) dengan overlay gradien gelap supaya judul tetap
-           terbaca -- gantinya, kotak galeri terpisah di bawah disembunyikan
-           total di mobile (hidden md:block) supaya tidak dobel/perlu scroll. -->
-      <div class="md:hidden absolute inset-0 z-0">
-        <Transition name="fade-hero">
-          <img
-            :key="indeksGambarHero"
-            :src="gambarHero[indeksGambarHero]"
-            alt="Denanta TranSolution"
-            class="absolute inset-0 w-full h-full object-cover"
-          />
-        </Transition>
-        <div class="absolute inset-0 bg-gradient-to-b from-black/70 via-black/55 to-background"></div>
-      </div>
-
       <div class="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-xl md:py-[80px] flex flex-col md:flex-row items-center gap-gutter relative z-10 w-full">
       <div class="md:w-1/2 flex flex-col gap-6 z-10 text-left">
         <h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-display-lg md:text-display-lg text-white md:text-on-background tracking-tight leading-tight">
@@ -688,7 +735,7 @@ const namaPengguna = computed(() => {
 <style scoped>
 .fade-hero-enter-active,
 .fade-hero-leave-active {
-  transition: opacity 0.9s ease;
+  transition: opacity 1.4s ease-in-out;
 }
 .fade-hero-enter-from,
 .fade-hero-leave-to {
