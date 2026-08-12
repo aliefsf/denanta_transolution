@@ -208,9 +208,9 @@ const konfirmasiBersihkanSemua = async () => {
 
         <!-- Content -->
         <div class="flex-grow space-y-1.5">
-          <div class="flex justify-between items-center text-[10px]">
+          <div class="flex flex-wrap justify-between items-center gap-x-3 gap-y-0.5 text-[10px]">
             <span class="font-bold uppercase tracking-wider text-on-surface-variant">{{ notif.labelKategori }}</span>
-            <span class="text-on-surface-variant font-mono">{{ notif.waktu }}</span>
+            <span class="text-on-surface-variant font-mono whitespace-nowrap">{{ notif.waktu }}</span>
           </div>
           <p class="text-sm font-bold text-on-surface leading-snug">{{ notif.pesan }}</p>
           <p class="text-[11px] text-on-surface-variant leading-relaxed">{{ notif.detail }}</p>

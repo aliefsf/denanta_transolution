@@ -356,9 +356,9 @@ const lihatLokasiLangsung = (anak: AnakTampilan) => {
                   <component :is="notif.tampilan.ikon" class="w-4 h-4" />
                 </div>
                 <div class="flex-grow space-y-1 min-w-0">
-                  <div class="flex justify-between items-center text-[10px]">
+                  <div class="flex flex-wrap justify-between items-center gap-x-3 gap-y-0.5 text-[10px]">
                     <span class="font-bold uppercase tracking-wider text-on-surface-variant">{{ notif.kategori }}</span>
-                    <span class="text-on-surface-variant font-mono">{{ notif.waktu }}</span>
+                    <span class="text-on-surface-variant font-mono whitespace-nowrap">{{ notif.waktu }}</span>
                   </div>
                   <!-- Judul = info paling penting (mis. "Penjemputan Dimulai: Ananda"), ditonjolkan dibanding isi pesan -->
                   <p class="text-xs font-bold text-on-surface leading-snug">{{ notif.judul }}</p>
