@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Plus, Trash2, Eye, Pencil, Loader2, Upload, AlertTriangle } from 'lucide-vue-next';
+import { Plus, Trash2, Eye, Pencil, Loader2, Upload, AlertTriangle, User } from 'lucide-vue-next';
 import ModalUtama from '../umum/ModalUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
@@ -9,11 +9,13 @@ import {
   buatAkunSupir,
   unggahDokumenSupir,
   perbaruiSupir,
+  perbaruiFotoProfilSupir,
   perbaruiStatusVerifikasiSupir,
   togglAktifSupir,
   hapusSupir as hapusSupirLayanan,
   type SupirDenganPengguna
 } from '../../layanan/adminLayanan';
+import { unggahFotoProfilSupir } from '../../layanan/supirLayanan';
 import { pantauTabelAdminRealtime } from '../../layanan/realtimeLayanan';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 
@@ -85,6 +87,13 @@ const formTanggalSelesaiKerja = ref('');
 const formKtp = ref<File | null>(null);
 const formSim = ref<File | null>(null);
 const formStnk = ref<File | null>(null);
+// Foto Profil (Opsional) -- pola sama seperti ProfilSupir.vue: dipilih
+// lokal dulu (preview instan via URL.createObjectURL), baru benar-benar
+// diunggah setelah akun berhasil dibuat (butuh supirId hasil buatAkunSupir).
+const formFoto = ref<File | null>(null);
+const formFotoPreview = ref('');
+const inputFotoTambah = ref<HTMLInputElement | null>(null);
+const inputFotoEdit = ref<HTMLInputElement | null>(null);
 
 // Opsi kendaraan baru yang dikonfirmasi admin lewat tombol "Tambah" pada sesi
 // ini -- supaya langsung terlihat di dropdown sebelum baris supir manapun
@@ -129,9 +138,34 @@ const resetFormTambah = () => {
   formKtp.value = null;
   formSim.value = null;
   formStnk.value = null;
+  formFoto.value = null;
+  formFotoPreview.value = '';
 };
 
 const MAKS_UKURAN_DOKUMEN = 10 * 1024 * 1024; // 10 MB, selaras dengan batas bucket "dokumen-supir"
+const MAKS_UKURAN_FOTO = 5 * 1024 * 1024; // 5 MB, selaras dengan ProfilSupir.vue
+
+const pilihFotoProfil = (e: Event, target: 'tambah' | 'edit') => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+
+  if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+    picuToast('Format foto harus PNG atau JPG.', 'error');
+    return;
+  }
+  if (file.size > MAKS_UKURAN_FOTO) {
+    picuToast('Ukuran foto maksimal 5 MB.', 'error');
+    return;
+  }
+
+  if (target === 'tambah') {
+    formFoto.value = file;
+    formFotoPreview.value = URL.createObjectURL(file);
+  } else {
+    formEditFoto.value = file;
+    formEditFotoPreview.value = URL.createObjectURL(file);
+  }
+};
 
 const pilihBerkas = (e: Event, target: 'ktp' | 'sim' | 'stnk') => {
   const input = e.target as HTMLInputElement;
@@ -194,13 +228,15 @@ const tambahSupir = async () => {
     // ketiga upload padahal bisa berjalan bersamaan -- inilah penyebab
     // utama proses "Menyimpan..." terasa sangat lama sebelumnya.
     try {
-      await Promise.all([
+      const [, , , fotoUrl] = await Promise.all([
         formKtp.value ? unggahDokumenSupir(supirId, 'ktp', formKtp.value) : null,
         formSim.value ? unggahDokumenSupir(supirId, 'sim', formSim.value) : null,
-        formStnk.value ? unggahDokumenSupir(supirId, 'stnk', formStnk.value) : null
+        formStnk.value ? unggahDokumenSupir(supirId, 'stnk', formStnk.value) : null,
+        formFoto.value ? unggahFotoProfilSupir(supirId, formFoto.value) : null
       ]);
+      if (fotoUrl) await perbaruiFotoProfilSupir(supirId, fotoUrl);
     } catch (errUpload: any) {
-      picuToast(`Akun supir dibuat, tapi unggah dokumen gagal: ${errUpload.message}`, 'error');
+      picuToast(`Akun supir dibuat, tapi unggah dokumen/foto gagal: ${errUpload.message}`, 'error');
       modalTambahTampil.value = false;
       resetFormTambah();
       await muatDaftarSupir();
@@ -263,6 +299,12 @@ const formEditTipe = ref<'tetap' | 'sementara'>('tetap');
 const formEditTanggalMulaiKerja = ref('');
 const formEditTanggalSelesaiKerja = ref('');
 const formEditAktif = ref(true);
+// Foto Profil (Opsional) -- fotoProfilLama dipakai sebagai fallback preview
+// (foto yang sudah tersimpan), formEditFotoPreview cuma terisi kalau Admin
+// memilih file baru di modal ini.
+const fotoProfilLama = ref('');
+const formEditFoto = ref<File | null>(null);
+const formEditFotoPreview = ref('');
 const formEditKtp = ref<File | null>(null);
 const formEditSim = ref<File | null>(null);
 const formEditStnk = ref<File | null>(null);
@@ -293,6 +335,9 @@ const bukaEdit = (supir: SupirDenganPengguna) => {
   formEditTanggalMulaiKerja.value = supir.tanggalMulaiKerja ?? '';
   formEditTanggalSelesaiKerja.value = supir.tanggalSelesaiKerja ?? '';
   formEditAktif.value = supir.aktif;
+  fotoProfilLama.value = supir.fotoProfil ?? '';
+  formEditFoto.value = null;
+  formEditFotoPreview.value = '';
   formEditKtp.value = null;
   formEditSim.value = null;
   formEditStnk.value = null;
@@ -310,6 +355,16 @@ const simpanEditSupir = async () => {
 
   sedangMenyimpan.value = true;
   try {
+    // Paralel -- lihat catatan yang sama di tambahSupir() soal kenapa ini
+    // tidak lagi satu-satu berurutan. Foto diunggah DULU (kalau ada) supaya
+    // URL-nya bisa disertakan langsung ke perbaruiSupir() di bawah.
+    const [, , , fotoUrl] = await Promise.all([
+      formEditKtp.value ? unggahDokumenSupir(supirIdEdit.value, 'ktp', formEditKtp.value) : null,
+      formEditSim.value ? unggahDokumenSupir(supirIdEdit.value, 'sim', formEditSim.value) : null,
+      formEditStnk.value ? unggahDokumenSupir(supirIdEdit.value, 'stnk', formEditStnk.value) : null,
+      formEditFoto.value ? unggahFotoProfilSupir(supirIdEdit.value, formEditFoto.value) : null
+    ]);
+
     await perbaruiSupir(supirIdEdit.value, {
       namaLengkap: formEditNama.value,
       nomorTelepon: formEditTelepon.value,
@@ -318,16 +373,9 @@ const simpanEditSupir = async () => {
       tipeSupir: formEditTipe.value,
       aktif: formEditAktif.value,
       tanggalMulaiKerja: formEditTanggalMulaiKerja.value || null,
-      tanggalSelesaiKerja: formEditTanggalSelesaiKerja.value || formEditTanggalMulaiKerja.value || null
+      tanggalSelesaiKerja: formEditTanggalSelesaiKerja.value || formEditTanggalMulaiKerja.value || null,
+      ...(fotoUrl ? { fotoProfil: fotoUrl } : {})
     });
-
-    // Paralel -- lihat catatan yang sama di tambahSupir() soal kenapa ini
-    // tidak lagi satu-satu berurutan.
-    await Promise.all([
-      formEditKtp.value ? unggahDokumenSupir(supirIdEdit.value, 'ktp', formEditKtp.value) : null,
-      formEditSim.value ? unggahDokumenSupir(supirIdEdit.value, 'sim', formEditSim.value) : null,
-      formEditStnk.value ? unggahDokumenSupir(supirIdEdit.value, 'stnk', formEditStnk.value) : null
-    ]);
 
     picuToast('Data supir berhasil diperbarui!', 'sukses');
     modalEditTampil.value = false;
@@ -609,6 +657,25 @@ const supirTerfilter = computed(() => {
       @tutup="modalTambahTampil = false"
     >
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="col-span-2 flex items-center gap-4">
+          <button
+            type="button"
+            class="relative w-16 h-16 rounded-full bg-surface-container-lowest border border-outline-variant flex items-center justify-center overflow-hidden cursor-pointer hover:border-primary transition-colors flex-shrink-0"
+            @click="inputFotoTambah?.click()"
+          >
+            <img v-if="formFotoPreview" :src="formFotoPreview" alt="Foto profil" class="w-full h-full object-cover" />
+            <User v-else class="w-6 h-6 text-on-surface-variant" />
+          </button>
+          <div class="space-y-1">
+            <input ref="inputFotoTambah" type="file" accept="image/png,image/jpeg,image/jpg" class="hidden" @change="pilihFotoProfil($event, 'tambah')" />
+            <TombolUtama tema="terang" varian="garis-luar" class="!py-1.5 !px-3 text-[11px] gap-1" @click.prevent="inputFotoTambah?.click()">
+              <Upload class="w-3.5 h-3.5" />
+              {{ formFotoPreview ? 'Ganti Foto' : 'Unggah Foto Profil (Opsional)' }}
+            </TombolUtama>
+            <p class="text-[10px] text-on-surface-variant">PNG/JPG, maksimal 5 MB.</p>
+          </div>
+        </div>
+
         <div>
           <label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">Nama Lengkap Driver (Wajib):</label>
           <input
@@ -750,6 +817,25 @@ const supirTerfilter = computed(() => {
       @tutup="modalEditTampil = false"
     >
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="col-span-2 flex items-center gap-4">
+          <button
+            type="button"
+            class="relative w-16 h-16 rounded-full bg-surface-container-lowest border border-outline-variant flex items-center justify-center overflow-hidden cursor-pointer hover:border-primary transition-colors flex-shrink-0"
+            @click="inputFotoEdit?.click()"
+          >
+            <img v-if="formEditFotoPreview || fotoProfilLama" :src="formEditFotoPreview || fotoProfilLama" alt="Foto profil" class="w-full h-full object-cover" />
+            <User v-else class="w-6 h-6 text-on-surface-variant" />
+          </button>
+          <div class="space-y-1">
+            <input ref="inputFotoEdit" type="file" accept="image/png,image/jpeg,image/jpg" class="hidden" @change="pilihFotoProfil($event, 'edit')" />
+            <TombolUtama tema="terang" varian="garis-luar" class="!py-1.5 !px-3 text-[11px] gap-1" @click.prevent="inputFotoEdit?.click()">
+              <Upload class="w-3.5 h-3.5" />
+              {{ formEditFotoPreview || fotoProfilLama ? 'Ganti Foto' : 'Unggah Foto Profil (Opsional)' }}
+            </TombolUtama>
+            <p class="text-[10px] text-on-surface-variant">PNG/JPG, maksimal 5 MB.</p>
+          </div>
+        </div>
+
         <div>
           <label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">Nama Lengkap Driver:</label>
           <input

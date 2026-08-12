@@ -5,6 +5,7 @@ import PetaGlobal from './PetaGlobal.vue';
 import { ambilPosisiSupirAktif, type PosisiSupirPeta } from '../../layanan/adminLayanan';
 import { pantauTabelAdminRealtime } from '../../layanan/realtimeLayanan';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
+import { warnaUntukSupir } from '../../bantuan/warnaSupir';
 
 // Filter States
 const filterSekolah = ref('semua');
@@ -82,19 +83,6 @@ onUnmounted(() => {
   saluranSupir = null;
 });
 
-function dapatkanLabelStatusPerjalanan(status: string | null): string {
-  if (!status) return 'Offline';
-  const map: Record<string, string> = {
-    dijadwalkan: 'Belum Mulai',
-    penjemputan: 'Menuju lokasi',
-    menuju_sekolah: 'Mengantar anak',
-    di_sekolah: 'Di sekolah',
-    pengantaran: 'Mengantar anak',
-    tiba: 'Sampai tujuan',
-    dibatalkan: 'Dibatalkan'
-  };
-  return map[status] ?? status;
-}
 </script>
 
 <template>
@@ -182,7 +170,15 @@ function dapatkanLabelStatusPerjalanan(status: string | null): string {
             <div class="flex justify-between items-start">
               <div class="space-y-1.5">
                 <div class="flex items-center gap-2">
-                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-extrabold flex-shrink-0">
+                  <!-- Warna badge SAMA PERSIS dengan marker & jalur milik
+                       supir ini di peta (warnaUntukSupir, keyed per id --
+                       bukan per index, supaya tidak tertukar walau urutan
+                       daftar berubah). Abu-abu netral kalau sedang offline,
+                       sama seperti aturan warna marker di PetaGlobal.vue. -->
+                  <span
+                    class="inline-flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-extrabold flex-shrink-0"
+                    :style="{ background: s.status === 'aktif' ? warnaUntukSupir(s.id) : '#475569' }"
+                  >
                     {{ idx + 1 }}
                   </span>
                   <h4 class="font-bold text-on-surface text-sm">{{ s.nama }}</h4>
@@ -190,7 +186,7 @@ function dapatkanLabelStatusPerjalanan(status: string | null): string {
                 <p class="text-[11px] text-on-surface-variant">
                   <strong>Status:</strong>
                   <span class="ml-1 font-semibold" :class="s.status === 'aktif' ? 'text-primary' : 'text-on-surface-variant'">
-                    {{ dapatkanLabelStatusPerjalanan(s.statusPerjalanan) }}
+                    Sedang Bertugas
                   </span>
                 </p>
                 <p class="text-[10px] text-on-surface-variant">Tujuan: {{ s.sekolahTujuan || '-' }}</p>

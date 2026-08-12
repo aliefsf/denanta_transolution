@@ -187,6 +187,7 @@ export interface SupirDenganPengguna {
   tersedia: boolean;
   tanggalMulaiKerja: string | null;
   tanggalSelesaiKerja: string | null;
+  fotoProfil: string | null;
 }
 
 /**
@@ -215,7 +216,7 @@ export async function ambilDaftarSupir(): Promise<SupirDenganPengguna[]> {
 
   const { data, error } = await client
     .from('supir')
-    .select('*, pengguna(nama_lengkap, email, nomor_telepon)')
+    .select('*, pengguna(nama_lengkap, email, nomor_telepon, foto_profil)')
     .order('dibuat_pada', { ascending: false });
   if (error) throw error;
 
@@ -234,7 +235,8 @@ export async function ambilDaftarSupir(): Promise<SupirDenganPengguna[]> {
     url_stnk: s.url_stnk,
     tersedia: s.tersedia,
     tanggalMulaiKerja: s.tanggal_mulai_kerja,
-    tanggalSelesaiKerja: s.tanggal_selesai_kerja
+    tanggalSelesaiKerja: s.tanggal_selesai_kerja,
+    fotoProfil: s.pengguna?.foto_profil ?? null
   }));
 }
 
@@ -291,6 +293,18 @@ export async function buatAkunSupir(data: DataSupirBaru): Promise<string> {
 }
 
 /**
+ * Simpan URL foto profil (hasil unggahFotoProfilSupir, supirLayanan.ts) ke
+ * akun supir yang BARU DIBUAT -- terpisah dari perbaruiSupir() karena pada
+ * titik ini Admin belum mengisi seluruh data PerubahanSupir (baru saja
+ * selesai buatAkunSupir), cukup kolom foto_profil saja yang perlu ditulis.
+ */
+export async function perbaruiFotoProfilSupir(supirId: string, fotoUrl: string): Promise<void> {
+  const client = klienWajibAda();
+  const { error } = await client.from('pengguna').update({ foto_profil: fotoUrl }).eq('id', supirId);
+  if (error) throw error;
+}
+
+/**
  * Unggah satu dokumen legalitas supir (KTP/SIM/STNK) ke bucket
  * "dokumen-supir" lalu simpan public URL-nya ke kolom terkait di tabel
  * supir. Dipanggil admin dari form Tambah/Edit Supir.
@@ -344,6 +358,11 @@ export interface PerubahanSupir {
   aktif: boolean;
   tanggalMulaiKerja?: string | null;
   tanggalSelesaiKerja?: string | null;
+  // Opsional -- diisi HANYA kalau Admin memilih foto baru di modal Edit
+  // Supir (lihat unggahFotoProfilSupir, supirLayanan.ts, dipanggil dari
+  // DataSupirAdmin.vue sebelum perbaruiSupir ini). undefined = foto lama
+  // dibiarkan apa adanya (kolom tidak ikut ter-update).
+  fotoProfil?: string;
 }
 
 /**
@@ -356,7 +375,14 @@ export async function perbaruiSupir(supirId: string, data: PerubahanSupir): Prom
 
   const { error: errPengguna } = await client
     .from('pengguna')
-    .update({ nama_lengkap: data.namaLengkap, nomor_telepon: data.nomorTelepon })
+    .update({
+      nama_lengkap: data.namaLengkap,
+      nomor_telepon: data.nomorTelepon,
+      // undefined otomatis dibuang saat di-serialize, jadi aman ditulis
+      // selalu -- kolom foto_profil cuma ikut ter-update kalau data.fotoProfil
+      // benar-benar diisi (Admin memilih foto baru).
+      ...(data.fotoProfil ? { foto_profil: data.fotoProfil } : {})
+    })
     .eq('id', supirId);
   if (errPengguna) throw errPengguna;
 

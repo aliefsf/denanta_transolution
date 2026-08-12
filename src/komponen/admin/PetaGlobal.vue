@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ambilRuteJalan } from '../../layanan/navigasiLayanan';
+import { warnaUntukSupir } from '../../bantuan/warnaSupir';
 
 interface DriverPosition {
   id: string;
@@ -54,14 +55,17 @@ const cacheKeyAktif: { [supirId: string]: string } = {};
 
 const kunciRute = (supir: DriverPosition) => `${supir.id}_${supir.destLat?.toFixed(5)}_${supir.destLng?.toFixed(5)}`;
 
-const buatIkonSupir = (supir: DriverPosition, nomor: number) => {
+const buatIkonSupir = (supir: DriverPosition, nomor: number, warna: string) => {
   const isOnline = supir.status === 'aktif';
-  const warnaBg = isOnline ? 'bg-primary' : 'bg-slate-600';
-  const warnaBorder = isOnline ? 'border-primary-container/30' : 'border-slate-400';
-  const pingEffect = isOnline ? '<span class="absolute inline-flex h-full w-full rounded-full bg-primary opacity-75 animate-ping"></span>' : '';
+  // Offline tetap abu-abu netral (tidak online = tidak punya jalur untuk
+  // dibedakan warnanya) -- warna identitas cuma dipakai selagi aktif.
+  const warnaLatar = isOnline ? warna : '#475569';
+  const pingEffect = isOnline
+    ? `<span class="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style="background:${warna}"></span>`
+    : '';
   return L.divIcon({
     html: `
-      <div class="relative w-8 h-8 rounded-full ${warnaBg} border-2 ${warnaBorder} flex items-center justify-center shadow-lg text-white font-extrabold text-xs">
+      <div class="relative w-8 h-8 rounded-full border-2 border-white flex items-center justify-center shadow-lg text-white font-extrabold text-xs" style="background:${warnaLatar}">
         ${pingEffect}
         <span class="relative z-10">${nomor}</span>
       </div>
@@ -72,17 +76,20 @@ const buatIkonSupir = (supir: DriverPosition, nomor: number) => {
   });
 };
 
-const popupSupir = (supir: DriverPosition, nomor: number) => `
+const popupSupir = (supir: DriverPosition, nomor: number, warna: string) => `
   <div class="text-xs text-slate-800 space-y-1">
-    <strong class="text-sm font-bold">${nomor}. ${supir.nama}</strong><br>
+    <strong class="text-sm font-bold flex items-center gap-1.5">
+      <span style="display:inline-block;width:9px;height:9px;border-radius:9999px;background:${warna}"></span>
+      ${nomor}. ${supir.nama}
+    </strong>
     <span class="font-semibold text-slate-500">Status:</span> ${supir.status === 'aktif' ? 'Online (Bertugas)' : 'Offline'}<br>
     <span class="font-semibold text-slate-500">Sekolah:</span> ${supir.sekolahTujuan || '-'}
   </div>
 `;
 
-const destIcon = L.divIcon({
+const buatDestIcon = (warna: string) => L.divIcon({
   html: `
-    <div class="w-6 h-6 rounded-full bg-rose-600 border-2 border-white flex items-center justify-center shadow-md text-white">
+    <div class="w-6 h-6 rounded-full border-2 border-white flex items-center justify-center shadow-md text-white" style="background:${warna}">
       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
     </div>
   `,
@@ -123,17 +130,18 @@ const renderMarkers = () => {
   props.supirList.forEach((supir, idx) => {
     const nomor = idx + 1;
     const isOnline = supir.status === 'aktif';
+    const warna = warnaUntukSupir(supir.id);
 
     // 1. Marker posisi -- GESER kalau sudah ada (data MARKER, murni posisi
     // realtime), jangan pernah dibongkar-pasang ulang.
     if (markers[supir.id]) {
       markers[supir.id].setLatLng([supir.lat, supir.lng]);
-      markers[supir.id].setIcon(buatIkonSupir(supir, nomor));
-      markers[supir.id].setPopupContent(popupSupir(supir, nomor));
+      markers[supir.id].setIcon(buatIkonSupir(supir, nomor, warna));
+      markers[supir.id].setPopupContent(popupSupir(supir, nomor, warna));
     } else {
-      markers[supir.id] = L.marker([supir.lat, supir.lng], { icon: buatIkonSupir(supir, nomor), zIndexOffset: 1000 })
+      markers[supir.id] = L.marker([supir.lat, supir.lng], { icon: buatIkonSupir(supir, nomor, warna), zIndexOffset: 1000 })
         .addTo(mapInstance)
-        .bindPopup(popupSupir(supir, nomor));
+        .bindPopup(popupSupir(supir, nomor, warna));
     }
 
     // 2. Rute (data RUTE, terpisah total dari posisi) -- hanya dihitung
@@ -155,7 +163,7 @@ const renderMarkers = () => {
 
         const garisAwal: [number, number][] = ruteCache[cacheKey] ?? [[supir.lat, supir.lng], [supir.destLat, supir.destLng]];
         const line = L.polyline(garisAwal, {
-          color: '#e94560', // warnaTombol (accent)
+          color: warna, // identitas warna per supir -- lihat warnaUntukSupir()
           weight: 3,
           opacity: 0.8,
           dashArray: '5, 10'
@@ -183,7 +191,7 @@ const renderMarkers = () => {
       if (destMarkers[supir.id]) {
         destMarkers[supir.id].setLatLng([supir.destLat, supir.destLng]);
       } else {
-        destMarkers[supir.id] = L.marker([supir.destLat, supir.destLng], { icon: destIcon })
+        destMarkers[supir.id] = L.marker([supir.destLat, supir.destLng], { icon: buatDestIcon(warna) })
           .addTo(mapInstance)
           .bindPopup(`<strong>Tujuan ${supir.nama}:</strong> ${supir.sekolahTujuan || 'Lokasi Tujuan'}`);
       }
