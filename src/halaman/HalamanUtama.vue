@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../penyimpanan/authStore';
 import { useAuth } from '../komposabel/useAuth';
 import FooterPublik from '../komponen/umum/FooterPublik.vue';
+import ModalUtama from '../komponen/umum/ModalUtama.vue';
 import { ambilPengaturanTarif, type PengaturanTarifRow } from '../layanan/tarifLayanan';
 import { formatMataUang } from '../bantuan/formatMataUang';
 import { kelasMenuNavbar, kelasMenuNavbarMobile } from '../bantuan/kelasMenuNavbar';
@@ -98,10 +99,23 @@ const navigasiKe = (path: string) => {
   menuTerbuka.value = false;
 };
 
-const keluarDariMenuMobile = async () => {
+const modalLogoutTampil = ref(false);
+const sedangLogout = ref(false);
+
+const bukaKonfirmasiLogout = () => {
   menuTerbuka.value = false;
-  await authStore.logout();
-  router.push('/');
+  modalLogoutTampil.value = true;
+};
+
+const konfirmasiLogoutMobile = async () => {
+  sedangLogout.value = true;
+  try {
+    await authStore.logout();
+    modalLogoutTampil.value = false;
+    router.push('/');
+  } finally {
+    sedangLogout.value = false;
+  }
 };
 
 // Ikon lonceng notifikasi navbar publik -- arahkan ke tab "Notifikasi" di
@@ -406,7 +420,7 @@ const namaPengguna = computed(() => {
               Edit Profil
             </router-link>
             <button
-              @click="keluarDariMenuMobile"
+              @click="bukaKonfirmasiLogout"
               class="w-full bg-transparent hover:bg-error-container/20 text-error py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0 flex items-center justify-center gap-2"
             >
               <LogOut class="w-4 h-4" />
@@ -762,6 +776,42 @@ const namaPengguna = computed(() => {
 
     <FooterPublik />
     </div>
+
+    <!-- Modal Konfirmasi Logout (sidebar mobile) -->
+    <ModalUtama
+      tema="terang"
+      :tampil="modalLogoutTampil"
+      judul="Konfirmasi Keluar"
+      ukuran="sedang"
+      @tutup="modalLogoutTampil = false"
+    >
+      <div class="space-y-3 text-center py-3">
+        <div class="w-12 h-12 bg-error-container/20 rounded-full flex items-center justify-center text-error mx-auto mb-2">
+          <LogOut class="w-6 h-6" />
+        </div>
+        <h3 class="text-base font-bold text-on-surface">Apakah Anda yakin ingin keluar?</h3>
+        <p class="text-xs text-on-surface-variant leading-relaxed">Sesi login Anda akan diakhiri dan Anda harus masuk kembali untuk mengakses portal ini.</p>
+      </div>
+
+      <template #footer>
+        <button
+          type="button"
+          class="px-5 py-2.5 rounded-full text-on-surface-variant font-semibold hover:text-on-surface transition-colors bg-transparent border-0 cursor-pointer text-sm"
+          :disabled="sedangLogout"
+          @click="modalLogoutTampil = false"
+        >
+          Batal
+        </button>
+        <button
+          type="button"
+          class="px-5 py-2.5 rounded-full bg-error hover:bg-error/90 text-white font-semibold transition-colors border-0 cursor-pointer text-sm disabled:opacity-60"
+          :disabled="sedangLogout"
+          @click="konfirmasiLogoutMobile"
+        >
+          {{ sedangLogout ? 'Memproses...' : 'Ya, Keluar' }}
+        </button>
+      </template>
+    </ModalUtama>
   </div>
 </template>
 
