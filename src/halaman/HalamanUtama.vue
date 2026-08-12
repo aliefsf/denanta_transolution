@@ -407,7 +407,7 @@ const namaPengguna = computed(() => {
             </router-link>
             <button
               @click="keluarDariMenuMobile"
-              class="w-full bg-error hover:bg-error/90 text-white py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0 flex items-center justify-center gap-2"
+              class="w-full bg-transparent hover:bg-error-container/20 text-error py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0 flex items-center justify-center gap-2"
             >
               <LogOut class="w-4 h-4" />
               Keluar
