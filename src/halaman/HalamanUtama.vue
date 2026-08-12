@@ -481,7 +481,7 @@ const namaPengguna = computed(() => {
              menjaga keterbacaan di atas foto. max-w-[90%] mencegah judul
              mepet ke tepi kanan layar. -->
         <h1 class="font-headline-lg-mobile font-bold text-[clamp(1.9rem,7vw,2.75rem)] leading-[1.15] md:font-display-lg md:text-display-lg md:leading-[56px] text-white md:text-on-background tracking-tight max-w-[90%] md:max-w-none [text-shadow:0_2px_10px_rgba(0,0,0,0.35)] md:[text-shadow:none]">
-          Pantau Perjalanan Anak dengan <span class="bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent [text-shadow:0_0_18px_rgba(16,185,129,0.55),0_0_36px_rgba(15,155,142,0.35)]">Aman &amp; Nyata</span> di Padang.
+          Pantau Perjalanan Anak dengan <span class="bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent [text-shadow:0_0_18px_rgba(255,255,255,0.75),0_0_36px_rgba(255,255,255,0.45)] md:[text-shadow:none]">Aman &amp; Nyata</span> di Padang.
         </h1>
         <p class="font-body-lg text-body-lg text-white/90 md:text-on-surface-variant max-w-lg leading-relaxed">
           Memberikan ketenangan pikiran bagi orang tua dengan layanan antar jemput sekolah yang profesional, terpantau secara real-time, dan mengutamakan keselamatan.
