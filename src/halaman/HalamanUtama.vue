@@ -8,7 +8,7 @@ import { ambilPengaturanTarif, type PengaturanTarifRow } from '../layanan/tarifL
 import { formatMataUang } from '../bantuan/formatMataUang';
 import { kelasMenuNavbar, kelasMenuNavbarMobile } from '../bantuan/kelasMenuNavbar';
 import {
-  Menu, X, Bell, User,
+  Menu, X, Bell, User, LogOut,
   ShieldCheck, MapPin, Clock, Check,
   HelpCircle, ChevronDown
 } from 'lucide-vue-next';
@@ -98,12 +98,10 @@ const navigasiKe = (path: string) => {
   menuTerbuka.value = false;
 };
 
-const navigasiDashboard = () => {
-  if (authStore.apakahAdmin) router.push('/admin');
-  else if (authStore.apakahSupir) router.push('/supir');
-  else if (authStore.apakahOrangTua) router.push('/orangtua');
-  else router.push('/');
+const keluarDariMenuMobile = async () => {
   menuTerbuka.value = false;
+  await authStore.logout();
+  router.push('/');
 };
 
 // Ikon lonceng notifikasi navbar publik -- arahkan ke tab "Notifikasi" di
@@ -408,10 +406,11 @@ const namaPengguna = computed(() => {
               Edit Profil
             </router-link>
             <button
-              @click="navigasiDashboard"
-              class="w-full bg-primary hover:bg-[#0D7A68] text-white py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0"
+              @click="keluarDariMenuMobile"
+              class="w-full bg-error hover:bg-error/90 text-white py-2.5 rounded-xl text-center font-semibold cursor-pointer border-0 flex items-center justify-center gap-2"
             >
-              Dashboard
+              <LogOut class="w-4 h-4" />
+              Keluar
             </button>
           </div>
           <div v-else class="flex flex-col gap-2">
