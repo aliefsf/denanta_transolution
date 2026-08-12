@@ -208,18 +208,25 @@ const namaPengguna = computed(() => {
 
 <template>
   <!-- Sidebar mobile "mendorong" konten (bukan overlay) -- transform di sini
-       WAJIB "none" (bukan "translateX(0)") saat tertutup, supaya elemen
-       fixed di dalamnya (nav) tetap benar-benar fixed ke viewport asli
-       seperti sebelumnya; "translateX(0)" pun sebenarnya sudah cukup untuk
-       menjadikan div ini containing-block bagi descendant fixed (aturan
-       CSS: transform apa pun selain none memicu itu), makanya dibedakan
-       eksplisit di sini, bukan cuma angka geser 0 vs -18rem. -->
-  <div
-    class="bg-background text-on-background font-body-md relative overflow-x-hidden min-h-screen pt-24 transition-transform duration-300"
-    :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }"
-  >
+       PENTING -- pembungkus PALING LUAR ini SENGAJA TIDAK diberi transform
+       geser sama sekali (beda dari versi sebelumnya). Alasannya: transform
+       pada elemen manapun otomatis menjadikannya containing-block BARU bagi
+       seluruh descendant fixed/absolute di dalamnya (aturan CSS) -- kalau
+       diterapkan di sini, background+overlay header (absolute, lihat di
+       bawah) ikut kena reparenting itu tiap kali sidebar dibuka/ditutup,
+       dan pada sebagian browser mobile itu menyebabkan overlay semi-
+       transparan sekilas hilang/lebih terang (bug yang dilaporkan). Supaya
+       background+overlay ini 100% kebal dari status sidebar, transform
+       geser sekarang dipasang TERPISAH: langsung di <nav> (lihat di bawah,
+       aman -- nav tidak punya descendant fixed) dan di pembungkus konten
+       "kontenGeser" yang membungkus Background Accents s.d. Footer (juga
+       aman, tidak ada descendant fixed penting di situ). -->
+  <div class="bg-background text-on-background font-body-md relative overflow-x-hidden min-h-screen pt-24">
 
-    <!-- Background image header (HANYA mobile/md:hidden) -- memakai carousel
+    <!-- Background image header (HANYA mobile/md:hidden) -- SELALU statis,
+         tidak pernah ikut transform apa pun (lihat catatan di atas) --
+         inilah yang memastikan overlay gelapnya tidak pernah hilang/berubah
+         terang gara-gara sidebar dibuka. Memakai carousel
          & transisi fade yang SAMA PERSIS dengan galeri desktop di Hero
          Section (gambarHero/indeksGambarHero, satu sumber data, bukan aset
          terpisah). Sengaja diletakkan di LUAR <section> Hero (top:0 relatif
@@ -231,37 +238,31 @@ const namaPengguna = computed(() => {
          dari hero -- navbar & hero jadi terlihat menyatu dalam satu
          background yang sama, bukan ada jeda putih di antara keduanya.
          Tingginya = tinggi navbar (pt-24 = 6rem) + tinggi hero mobile
-         (min-h-[580px] pada <section> Hero di bawah).
-
-         transform-gpu (translateZ(0)) WAJIB di sini DAN di kedua lapisan
-         overlay di bawah -- tanpa ini, begitu sidebar dibuka (pembungkus
-         terluar di atas ikut mendapat transform:translateX utk efek
-         geser), browser bisa salah menggabungkan/"meratakan" layer
-         overlay semi-transparan ini ke compositing layer milik ancestor
-         yang sama, membuatnya sekilas hilang/lebih terang (gambar latar
-         terlihat polos tanpa overlay gelap) -- transform-gpu memaksa
-         overlay ini jadi compositing layer-nya sendiri yang independen,
-         jadi tidak ikut "reset" saat ancestor-nya berubah transform. -->
-    <div class="md:hidden absolute top-0 left-0 right-0 h-[calc(6rem+580px)] z-0 bg-black transform-gpu">
+         (min-h-[580px] pada <section> Hero di bawah). -->
+    <div class="md:hidden absolute top-0 left-0 right-0 h-[calc(6rem+580px)] z-0 bg-black">
       <Transition name="fade-hero">
         <img
           :key="indeksGambarHero"
           :src="gambarHero[indeksGambarHero]"
           alt="Denanta TranSolution"
-          class="absolute inset-0 w-full h-full object-cover transform-gpu"
+          class="absolute inset-0 w-full h-full object-cover"
         />
       </Transition>
       <!-- Overlay MERATA (bukan cuma menggelapkan bagian bawah) supaya
            tingkat gelap navbar & hero konsisten -- lapisan gelap flat di
            atas seluruh gambar, ditambah gradien halus di tepi bawah saja
            utk transisi mulus ke warna background section berikutnya. -->
-      <div class="absolute inset-0 bg-black/45 transform-gpu"></div>
-      <div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background transform-gpu"></div>
+      <div class="absolute inset-0 bg-black/45"></div>
+      <div class="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background"></div>
     </div>
 
-    <!-- TopNavBar -->
+    <!-- TopNavBar -- transform geser dipasang LANGSUNG di sini (bukan
+         diwariskan dari ancestor) supaya navbar tetap ikut bergeser saat
+         sidebar dibuka TANPA membuat background+overlay di atas ikut
+         ter-reparenting (lihat catatan di pembungkus paling luar). -->
     <nav
-      class="fixed top-0 left-0 w-full z-50 transition-colors duration-300 md:bg-surface-container-lowest md:dark:bg-surface-dim md:border-b md:border-outline-variant/30 md:shadow-sm"
+      class="fixed top-0 left-0 w-full z-50 transition-[background-color,border-color,box-shadow,transform] duration-300 md:bg-surface-container-lowest md:dark:bg-surface-dim md:border-b md:border-outline-variant/30 md:shadow-sm"
+      :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }"
       :class="navMasihTransparan ? 'bg-transparent border-b border-transparent' : 'bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant/30 shadow-sm'"
     >
       <div class="flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-[1280px] mx-auto">
@@ -433,6 +434,12 @@ const namaPengguna = computed(() => {
       </aside>
     </Teleport>
 
+    <!-- Konten geser (Background Accents s.d. Footer) -- transform di sini
+         TERPISAH dari nav (lihat catatan di pembungkus terluar), supaya
+         seluruh isi halaman tetap ikut bergeser ke kiri saat sidebar
+         dibuka, tanpa mempengaruhi background+overlay header yang sengaja
+         dibuat statis. -->
+    <div class="transition-transform duration-300" :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }">
     <!-- Background Accents -->
     <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
       <div class="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-primary rounded-full opacity-[0.14] blur-3xl"></div>
@@ -466,7 +473,7 @@ const namaPengguna = computed(() => {
              maksimal 44px (di bawah ukuran desktop 48px). text-shadow
              menjaga keterbacaan di atas foto. max-w-[90%] mencegah judul
              mepet ke tepi kanan layar. -->
-        <h1 class="font-headline-lg-mobile text-[clamp(1.9rem,7vw,2.75rem)] leading-[1.15] md:font-display-lg md:text-display-lg md:leading-[56px] text-white md:text-on-background tracking-tight max-w-[90%] md:max-w-none [text-shadow:0_2px_10px_rgba(0,0,0,0.35)] md:[text-shadow:none]">
+        <h1 class="font-headline-lg-mobile font-bold text-[clamp(1.9rem,7vw,2.75rem)] leading-[1.15] md:font-display-lg md:text-display-lg md:leading-[56px] text-white md:text-on-background tracking-tight max-w-[90%] md:max-w-none [text-shadow:0_2px_10px_rgba(0,0,0,0.35)] md:[text-shadow:none]">
           Pantau Perjalanan Anak dengan <span class="bg-gradient-to-r from-primary to-emerald-500 bg-clip-text text-transparent">Aman &amp; Nyata</span> di Padang.
         </h1>
         <p class="font-body-lg text-body-lg text-white/90 md:text-on-surface-variant max-w-lg leading-relaxed">
@@ -748,6 +755,7 @@ const namaPengguna = computed(() => {
     </section>
 
     <FooterPublik />
+    </div>
   </div>
 </template>
 
