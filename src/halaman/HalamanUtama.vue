@@ -440,8 +440,15 @@ const namaPengguna = computed(() => {
          dibuka, tanpa mempengaruhi background+overlay header yang sengaja
          dibuat statis. -->
     <div class="transition-transform duration-300" :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }">
-    <!-- Background Accents -->
-    <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+    <!-- Background Accents -- disembunyikan di mobile (hidden md:block).
+         Div ini `fixed inset-0`, jadi SELALU menutupi viewport penuh di
+         posisi manapun -- termasuk lingkaran blur primary/tosca di pojok
+         kanan-atas (top:-10%) yang persis tumpang tindih dengan area hero,
+         memberi rona hijau di atas foto+overlay gelap yang sudah ada.
+         Cukup jadi aksen dekoratif untuk section-section di bawah hero
+         pada desktop; di mobile foto hero sendiri sudah jadi elemen visual
+         utama, tidak perlu accent tambahan ini. -->
+    <div class="hidden md:block fixed inset-0 z-0 overflow-hidden pointer-events-none">
       <div class="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-primary rounded-full opacity-[0.14] blur-3xl"></div>
       <div class="absolute bottom-[20%] left-[-10%] w-[500px] h-[500px] bg-primary-container rounded-full opacity-[0.20] blur-3xl"></div>
       <div class="absolute top-[15%] left-[35%] w-[380px] h-[380px] bg-tertiary rounded-full opacity-[0.05] blur-3xl"></div>
