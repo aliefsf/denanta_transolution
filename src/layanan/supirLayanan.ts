@@ -269,6 +269,10 @@ export interface TugasAnakSupir {
   lintangAntar: number;
   bujurAntar: number;
   diselesaikanPada: string | null;
+  // true kalau orang tua mengubah alamat jemput/antar SETELAH penugasan ini
+  // dibuat (lihat perbaruiAlamatAnak, orangTuaLayanan.ts) -- penugasan tetap
+  // sama, cuma titik lokasinya perlu diperhatikan (sudah beda dari sebelumnya).
+  alamatDiperbarui: boolean;
 }
 
 const DUA_JAM_MS = 2 * 60 * 60 * 1000;
@@ -320,7 +324,7 @@ export async function ambilTugasHariIni(tanggal: string): Promise<TugasAnakSupir
   const { data, error } = await client
     .from('perjalanan')
     .select(`
-      id, jenis_perjalanan, status, waktu_antar, diselesaikan_pada,
+      id, jenis_perjalanan, status, waktu_antar, diselesaikan_pada, alamat_diperbarui_pada,
       anak (
         id, nama_lengkap, kelas, url_foto, aktif,
         alamat_jemput, lintang_jemput, bujur_jemput,
@@ -372,7 +376,8 @@ export async function ambilTugasHariIni(tanggal: string): Promise<TugasAnakSupir
       alamatAntar: p.anak.alamat_antar,
       lintangAntar: p.anak.lintang_antar,
       bujurAntar: p.anak.bujur_antar,
-      diselesaikanPada: p.diselesaikan_pada
+      diselesaikanPada: p.diselesaikan_pada,
+      alamatDiperbarui: !!p.alamat_diperbarui_pada
     }));
 }
 

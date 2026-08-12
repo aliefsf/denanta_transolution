@@ -831,7 +831,12 @@ export interface PenugasanHariIni {
   sekolahList: string[];
   tanggal: string;
   jenisPerjalanan: 'pagi' | 'sore';
-  anakList: { perjalananId: string; nama: string; sekolah: string }[];
+  // alamatDiperbarui: true kalau orang tua mengubah alamat jemput/antar anak
+  // ini SETELAH penugasan dibuat (lihat perbaruiAlamatAnak, orangTuaLayanan.ts,
+  // yang menandai perjalanan.alamat_diperbarui_pada) -- anak TETAP di
+  // penugasan yang sama (beda dari perubahan waktu/hari yang membatalkan
+  // penugasan), tapi Admin perlu tahu titik lokasinya sudah berubah.
+  anakList: { perjalananId: string; nama: string; sekolah: string; alamatDiperbarui: boolean }[];
 }
 
 /**
@@ -1012,7 +1017,7 @@ export async function ambilPenugasanHariIni(tanggal: string): Promise<PenugasanH
   const { data: dataMentah, error } = await client
     .from('perjalanan')
     .select(
-      'id, supir_id, anak_id, jenis_perjalanan, anak(nama_lengkap, aktif, sekolah(nama))'
+      'id, supir_id, anak_id, jenis_perjalanan, alamat_diperbarui_pada, anak(nama_lengkap, aktif, sekolah(nama))'
     )
     .eq('tanggal_perjalanan', tanggal)
     .not('supir_id', 'is', null)
@@ -1057,7 +1062,12 @@ export async function ambilPenugasanHariIni(tanggal: string): Promise<PenugasanH
       sekolahSetByKey.set(key, new Set());
     }
     const namaSekolah = p.anak?.sekolah?.nama ?? '-';
-    kelompok.get(key)!.anakList.push({ perjalananId: p.id, nama: p.anak?.nama_lengkap ?? '-', sekolah: namaSekolah });
+    kelompok.get(key)!.anakList.push({
+      perjalananId: p.id,
+      nama: p.anak?.nama_lengkap ?? '-',
+      sekolah: namaSekolah,
+      alamatDiperbarui: !!p.alamat_diperbarui_pada
+    });
     if (namaSekolah !== '-') sekolahSetByKey.get(key)!.add(namaSekolah);
   }
 

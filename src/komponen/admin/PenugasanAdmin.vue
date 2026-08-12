@@ -209,7 +209,7 @@ const bukaDetailPenugasan = (penugasan: PenugasanHariIni) => {
 // (urutan penugasan dibuat).
 const anakPerSekolahDetail = computed(() => {
   if (!penugasanDetail.value) return [];
-  const peta = new Map<string, { perjalananId: string; nama: string }[]>();
+  const peta = new Map<string, { perjalananId: string; nama: string; alamatDiperbarui: boolean }[]>();
   for (const anak of penugasanDetail.value.anakList) {
     if (!peta.has(anak.sekolah)) peta.set(anak.sekolah, []);
     peta.get(anak.sekolah)!.push(anak);
@@ -537,6 +537,17 @@ const buatPenugasan = async () => {
                 >
                   <span class="text-on-surface-variant font-mono text-[10px] w-5">{{ idx + 1 }}.</span>
                   <span class="font-medium">{{ anak.nama }}</span>
+                  <!-- Orang tua mengubah alamat jemput/antar SETELAH anak ini
+                       ditugaskan -- penugasan/supirnya TIDAK berubah, cuma
+                       titik lokasinya yang perlu diperhatikan Admin/Supir. -->
+                  <span
+                    v-if="anak.alamatDiperbarui"
+                    class="flex items-center gap-1 ml-auto text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full flex-shrink-0"
+                    title="Alamat jemput/antar diperbarui orang tua setelah penugasan dibuat"
+                  >
+                    <AlertTriangle class="w-3 h-3" />
+                    Alamat diperbarui
+                  </span>
                 </li>
               </ul>
             </div>

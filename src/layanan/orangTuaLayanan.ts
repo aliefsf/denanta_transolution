@@ -179,6 +179,29 @@ export async function perbaruiAlamatAnak(params: {
   const { error } = await client.from('anak').update(payload).eq('id', params.anakId);
   if (error) throw error;
 
+  // Tandai baris `perjalanan` yang SEDANG aktif (hari ini/akan datang,
+  // masih 'dijadwalkan') dengan alamat_diperbarui_pada -- SATU-SATUNYA
+  // tujuan kolom ini supaya PenugasanAdmin.vue bisa menampilkan indikator
+  // "Alamat diperbarui" yang akurat (bukan sekadar menebak dari
+  // anak.diperbarui_pada, yang ikut berubah untuk field APAPUN yang
+  // diedit, bukan cuma alamat). Perubahan ALAMAT SAJA (fungsi ini) SENGAJA
+  // TIDAK membatalkan/mengubah penugasan yang sudah ada -- anak tetap di
+  // supir yang sama, cukup titik lokasinya yang diperbarui (beda dari
+  // perubahan waktu/hari, lihat sinkronkanPerjalananSetelahPerubahanJadwal()).
+  // Best-effort: kegagalan di sini tidak boleh menggagalkan update alamat
+  // yang sudah berhasil tersimpan di atas.
+  try {
+    await client
+      .from('perjalanan')
+      .update({ alamat_diperbarui_pada: ambilWaktuSekarang().toISOString() })
+      .eq('anak_id', params.anakId)
+      .eq('jenis_perjalanan', jenis === 'pergi' ? 'pagi' : 'sore')
+      .eq('status', 'dijadwalkan')
+      .gte('tanggal_perjalanan', ambilTanggalWibSekarang());
+  } catch (err) {
+    console.error('Gagal menandai alamat_diperbarui_pada pada perjalanan aktif:', err);
+  }
+
   // Beritahu Admin -- alamat baru bisa perlu penyesuaian rute
   // penugasan supir. Best-effort, lihat catatan yang sama di
   // ajukanCuti()/ubahJadwalMingguan()/ajukanPerubahanJadwal().
@@ -1035,26 +1058,22 @@ function buatIdPesananPerubahanJadwal(): string {
 }
 
 /**
- * Setelah pengajuan perubahan jadwal tersimpan, sinkronkan ke tabel
+ * Setelah pengajuan PERUBAHAN WAKTU/HARI tersimpan, sinkronkan ke tabel
  * `perjalanan` operasional (yang dipakai Admin "Penugasan Supir -> Jadwal
- * Jemput" & Supir "Tugas Hari Ini") supaya anak tidak terlihat dobel
- * jadwal:
+ * Jemput" & Supir "Tugas Hari Ini").
  *
- * 1. Cari perjalanan TERDEKAT yang akan datang (status masih 'dijadwalkan')
- *    utk anak & sesi (pagi/sore) yang sama.
- *    - Kalau tanggalnya SAMA dgn tanggal baru -> itu memang baris yang
- *      dimaksud, tinggal diperbarui catatannya (tidak perlu dibatalkan).
- *    - Kalau tanggalnya BEDA -> itulah jadwal LAMA yang digantikan:
- *      ditandai 'dibatalkan' (BUKAN dihapus -- tetap tersimpan sbg histori,
- *      mengikuti konvensi batalkanPenugasan() yang sudah ada), supirnya
- *      (kalau sudah ditugaskan) diberi tahu pickup itu batal.
- * 2. Kalau ada baris perjalanan lain yang KEBETULAN sudah dibuat Admin utk
- *    tanggal baru (mis. lewat "Buat Penugasan" batch harian), perbarui
- *    catatannya dgn info jadwal baru & beri tahu supirnya. Kalau belum ada
- *    (kasus paling umum, karena penugasan/pemilihan supir tetap tindakan
- *    manual Admin per tanggal), tidak ada baris baru yang dibuat di sini --
- *    notifikasi ke Admin (dikirim oleh pemanggil) sudah cukup memberi tahu
- *    supaya anak ini diikutkan saat Admin membuat penugasan tanggal itu.
+ * ATURAN BISNIS: perubahan waktu/hari SELALU membatalkan penugasan yang
+ * sudah diberikan Admin (kalau ada) -- anak WAJIB ditugaskan ulang secara
+ * manual oleh Admin sesuai jadwal terbaru, TIDAK PERNAH dipertahankan diam-
+ * diam dengan supir yang sama (beda dari perubahan ALAMAT SAJA, yang
+ * ditangani terpisah lewat perbaruiAlamatAnak() -- tidak pernah lewat
+ * fungsi ini sama sekali, karena alamat saja tidak mempengaruhi jam/hari
+ * operasional, jadi anak boleh tetap di penugasan yang sama). Baris lama
+ * ditandai 'dibatalkan' (BUKAN dihapus -- tetap tersimpan sbg histori),
+ * supirnya (kalau sudah ditugaskan) diberi tahu. Sengaja TIDAK PERNAH
+ * otomatis menyambung ke/membuat baris baru untuk tanggal barunya --
+ * notifikasi ke Admin (dikirim pemanggil) sudah cukup memberi tahu supaya
+ * anak ini di-assign ulang saat Admin membuat penugasan berikutnya.
  */
 async function sinkronkanPerjalananSetelahPerubahanJadwal(
   client: NonNullable<typeof supabase>,
@@ -1066,9 +1085,8 @@ async function sinkronkanPerjalananSetelahPerubahanJadwal(
     waktuBaru: string;
     alamatBaru: string;
   }
-): Promise<{ perjalananLamaId: string | null; perjalananBaruId: string | null }> {
+): Promise<{ perjalananLamaId: string | null }> {
   const jenisSesi = params.jenisPerubahan === 'pergi' ? 'pagi' : 'sore';
-  const catatanBaru = `Perubahan jadwal disetujui: ${params.jenisPerubahan === 'pergi' ? 'berangkat' : 'pulang'} pukul ${params.waktuBaru}, alamat ${params.jenisPerubahan === 'pergi' ? 'penjemputan' : 'pengantaran'}: ${params.alamatBaru}.`;
 
   const { data: perjalananTerdekat } = await client
     .from('perjalanan')
@@ -1082,12 +1100,14 @@ async function sinkronkanPerjalananSetelahPerubahanJadwal(
     .maybeSingle();
 
   let perjalananLamaId: string | null = null;
-  if (perjalananTerdekat && perjalananTerdekat.tanggal_perjalanan !== params.tanggalBaru) {
-    // Jadwal lama digantikan -- batalkan (tetap tersimpan sbg histori).
+  if (perjalananTerdekat) {
     perjalananLamaId = perjalananTerdekat.id;
     await client
       .from('perjalanan')
-      .update({ status: 'dibatalkan', catatan: `Dibatalkan otomatis -- dipindahkan ke tanggal ${formatTanggalIndonesiaDenganHari(params.tanggalBaru)} atas pengajuan perubahan jadwal.` })
+      .update({
+        status: 'dibatalkan',
+        catatan: `Dibatalkan otomatis -- orang tua mengajukan perubahan jadwal (waktu/hari) ${params.jenisPerubahan === 'pergi' ? 'berangkat' : 'pulang'} menjadi pukul ${params.waktuBaru} tanggal ${formatTanggalIndonesiaDenganHari(params.tanggalBaru)}. Menunggu penugasan ulang oleh Admin.`
+      })
       .eq('id', perjalananTerdekat.id);
 
     if (perjalananTerdekat.supir_id) {
@@ -1095,7 +1115,7 @@ async function sinkronkanPerjalananSetelahPerubahanJadwal(
         await kirimNotifikasi({
           penggunaId: perjalananTerdekat.supir_id,
           judul: 'Penjemputan/Pengantaran Dibatalkan',
-          pesan: `${params.namaAnak} mengajukan perubahan jadwal -- penjemputan/pengantaran tanggal ${formatTanggalIndonesiaDenganHari(perjalananTerdekat.tanggal_perjalanan)} DIBATALKAN, dipindahkan ke tanggal ${formatTanggalIndonesiaDenganHari(params.tanggalBaru)}.`,
+          pesan: `${params.namaAnak} mengajukan perubahan jadwal -- penjemputan/pengantaran tanggal ${formatTanggalIndonesiaDenganHari(perjalananTerdekat.tanggal_perjalanan)} DIBATALKAN, menunggu penugasan ulang dari Admin.`,
           tipe: 'perjalanan',
           idTerkait: perjalananTerdekat.id,
           tipeTerkait: 'penugasan_dibatalkan'
@@ -1106,41 +1126,7 @@ async function sinkronkanPerjalananSetelahPerubahanJadwal(
     }
   }
 
-  // Kalau Admin sudah kebetulan membuat baris perjalanan utk tanggal baru
-  // (mis. lewat batch "Buat Penugasan"), perbarui catatannya & beri tahu
-  // supirnya. Kalau belum ada baris sama sekali, tidak ada yang bisa
-  // disinkronkan di sini -- lihat catatan fungsi di atas.
-  const { data: perjalananTanggalBaru } = await client
-    .from('perjalanan')
-    .select('id, supir_id')
-    .eq('anak_id', params.anakId)
-    .eq('jenis_perjalanan', jenisSesi)
-    .eq('tanggal_perjalanan', params.tanggalBaru)
-    .neq('status', 'dibatalkan')
-    .maybeSingle();
-
-  let perjalananBaruId: string | null = null;
-  if (perjalananTanggalBaru) {
-    perjalananBaruId = perjalananTanggalBaru.id;
-    await client.from('perjalanan').update({ catatan: catatanBaru }).eq('id', perjalananTanggalBaru.id);
-
-    if (perjalananTanggalBaru.supir_id) {
-      try {
-        await kirimNotifikasi({
-          penggunaId: perjalananTanggalBaru.supir_id,
-          judul: 'Perubahan Jadwal Anak',
-          pesan: `${params.namaAnak}: ${catatanBaru}`,
-          tipe: 'perjalanan',
-          idTerkait: perjalananTanggalBaru.id,
-          tipeTerkait: 'jadwal_mingguan_diubah'
-        });
-      } catch (err) {
-        console.error('Gagal kirim notifikasi perubahan jadwal anak ke supir:', err);
-      }
-    }
-  }
-
-  return { perjalananLamaId, perjalananBaruId };
+  return { perjalananLamaId };
 }
 
 /**
@@ -1170,7 +1156,7 @@ async function sinkronDanBeritahuAdminPerubahanJadwal(
   // sini TIDAK BOLEH membatalkan pengajuan yang sudah tersimpan, karena
   // bagaimanapun Admin masih diberi tahu lewat notifikasi di bawah.
   try {
-    const { perjalananLamaId, perjalananBaruId } = await sinkronkanPerjalananSetelahPerubahanJadwal(client, {
+    const { perjalananLamaId } = await sinkronkanPerjalananSetelahPerubahanJadwal(client, {
       anakId: params.anakId,
       namaAnak: params.namaAnak,
       jenisPerubahan: params.jenisPerubahan,
@@ -1181,22 +1167,25 @@ async function sinkronDanBeritahuAdminPerubahanJadwal(
     // Simpan referensi baris perjalanan yang terdampak -- WAJIB utk
     // rollback presisi kalau pengajuan ini nanti diedit/dibatalkan lewat
     // editPengajuanPerubahanJadwalAktif()/batalkanPengajuanPerubahanJadwalAktif().
+    // perjalanan_baru_id SELALU null sekarang -- perubahan waktu/hari tidak
+    // pernah otomatis menyambung ke baris baru, lihat catatan fungsi di atas.
     await client
       .from('pengajuan_perubahan_jadwal')
-      .update({ perjalanan_lama_id: perjalananLamaId, perjalanan_baru_id: perjalananBaruId })
+      .update({ perjalanan_lama_id: perjalananLamaId, perjalanan_baru_id: null })
       .eq('id', pengajuanId);
   } catch {
     // Biarkan gagal senyap -- lihat catatan di atas.
   }
 
   // Beritahu Admin -- perubahan jadwal ini otomatis berlaku (tidak ada alur
-  // persetujuan terpisah), tapi rute penugasan supir bisa perlu disesuaikan
-  // begitu jam/alamat jemput-antar anak berubah. Best-effort, lihat catatan
-  // yang sama di ajukanCuti()/ubahJadwalMingguan().
+  // persetujuan terpisah), dan penugasan lama (kalau ada) sudah otomatis
+  // dibatalkan (lihat sinkronkanPerjalananSetelahPerubahanJadwal) -- Admin
+  // WAJIB menugaskan ulang anak ini sesuai jadwal terbaru. Best-effort,
+  // lihat catatan yang sama di ajukanCuti()/ubahJadwalMingguan().
   try {
     await kirimNotifikasiKeAdmin({
-      judul: 'Pengajuan Perubahan Jadwal',
-      pesan: `${params.namaAnak} mengajukan perubahan jadwal ${params.jenisPerubahan === 'pergi' ? 'Pergi' : 'Pulang'} tanggal ${formatTanggalIndonesiaDenganHari(params.tanggal)} menjadi pukul ${params.waktuBaru}. Alamat ${params.jenisPerubahan === 'pergi' ? 'penjemputan' : 'pengantaran'} baru: ${params.alamatBaru}.`,
+      judul: 'Pengajuan Perubahan Jadwal -- Perlu Penugasan Ulang',
+      pesan: `${params.namaAnak} mengajukan perubahan jadwal ${params.jenisPerubahan === 'pergi' ? 'Pergi' : 'Pulang'} tanggal ${formatTanggalIndonesiaDenganHari(params.tanggal)} menjadi pukul ${params.waktuBaru}. Alamat ${params.jenisPerubahan === 'pergi' ? 'penjemputan' : 'pengantaran'} baru: ${params.alamatBaru}. Penugasan lama (kalau ada) sudah dibatalkan otomatis -- mohon tugaskan ulang.`,
       tipe: 'sistem',
       idTerkait: pengajuanId,
       tipeTerkait: 'pengajuan_perubahan_jadwal'

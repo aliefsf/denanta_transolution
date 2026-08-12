@@ -2578,3 +2578,19 @@ CREATE TRIGGER trg_akumulasi_jarak_perjalanan_supir
 BEFORE UPDATE OF lintang_terkini, bujur_terkini ON supir
 FOR EACH ROW
 EXECUTE FUNCTION akumulasi_jarak_perjalanan_supir();
+
+-- ==========================================
+-- MIGRASI: TANDAI PERUBAHAN ALAMAT PADA PENUGASAN AKTIF
+-- Aturan bisnis: perubahan ALAMAT SAJA (bukan waktu/hari) tidak boleh
+-- membatalkan/menugaskan ulang penugasan yang sudah diberikan Admin -- anak
+-- tetap di supir yang sama, cuma titik lokasinya yang berubah (beda dari
+-- perubahan waktu/hari, yang WAJIB dibatalkan & di-assign ulang, lihat
+-- sinkronkanPerjalananSetelahPerubahanJadwal di orangTuaLayanan.ts). Kolom
+-- ini menandai KAPAN alamat anak pada baris penugasan ini terakhir diubah
+-- SETELAH penugasan dibuat -- dipakai PenugasanAdmin.vue (badge "Alamat
+-- diperbarui") dan KartuTugas.vue (sisi Supir, catatan "Alamat telah
+-- diperbarui pengguna") supaya keduanya tahu titik lokasi sudah berubah
+-- tanpa perlu menugaskan ulang. Sengaja bukan boolean polos -- timestamp
+-- lebih fleksibel kalau suatu saat perlu urutan/expiry.
+-- ==========================================
+ALTER TABLE perjalanan ADD COLUMN IF NOT EXISTS alamat_diperbarui_pada timestamptz;

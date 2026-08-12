@@ -81,6 +81,9 @@ const koordinatTujuan = computed(() =>
           <p class="text-[10px] text-on-surface-variant truncate max-w-[200px]" :title="alamatTujuan">
             {{ alamatTujuan }}
           </p>
+          <p v-if="anak.alamatDiperbarui" class="text-[10px] font-semibold text-amber-600">
+            Catatan: Alamat telah diperbarui pengguna
+          </p>
         </div>
       </div>
     </div>

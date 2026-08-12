@@ -139,6 +139,20 @@ const hariIniIso = computed(() => {
   return ambilTanggalWibSekarang();
 });
 
+// Jam:menit WIB "sekarang" (ikut waktu simulasi & denyutWaktuUI, sama
+// seperti hariIniIso) -- dipakai membatasi input "Waktu Berangkat/Pulang
+// Baru" supaya tidak bisa memilih jam yang sudah lewat KHUSUS kalau
+// tanggal yang dipilih adalah hari ini (kalau tanggalnya besok/nanti, jam
+// berapa pun tetap valid).
+const waktuWibSekarangHhMm = computed(() => {
+  void denyutWaktuUI.value;
+  const wib = new Date(ambilWaktuSekarang().getTime() + 7 * 60 * 60 * 1000);
+  return `${String(wib.getUTCHours()).padStart(2, '0')}:${String(wib.getUTCMinutes()).padStart(2, '0')}`;
+});
+const minWaktuPerubahan = computed(() =>
+  perubahanTanggal.value === hariIniIso.value ? waktuWibSekarangHhMm.value : undefined
+);
+
 const namaBulanTahunIni = computed(() =>
   hariIniObj.value.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
 );
@@ -691,6 +705,11 @@ const ajukanPerubahanJadwal = async () => {
   if (tipePerubahan.value === 'jadwal') {
     if (!perubahanTanggal.value || perubahanTanggal.value < hariIniIso.value) {
       picuToast('Tanggal perubahan jadwal tidak boleh sebelum hari ini.', 'error');
+      return;
+    }
+
+    if (perubahanTanggal.value === hariIniIso.value && perubahanWaktu.value <= waktuWibSekarangHhMm.value) {
+      picuToast('Waktu yang dipilih sudah lewat. Pilih jam setelah waktu sekarang untuk perubahan jadwal hari ini.', 'error');
       return;
     }
 
@@ -1306,8 +1325,12 @@ const LABEL_ALASAN_CUTI: Record<string, string> = {
                 <input
                   type="time"
                   v-model="perubahanWaktu"
+                  :min="minWaktuPerubahan"
                   class="w-full px-3 py-2 bg-surface-bright border border-outline-variant rounded-xl text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container text-xs font-mono"
                 />
+                <p v-if="minWaktuPerubahan" class="mt-1 text-[10px] text-on-surface-variant">
+                  Untuk hari ini, pilih jam setelah {{ minWaktuPerubahan }} WIB.
+                </p>
               </div>
 
               <div class="md:col-span-2 space-y-1.5">
