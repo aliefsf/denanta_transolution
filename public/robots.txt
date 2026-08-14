@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://denanta-transolution.vercel.app/sitemap.xml
