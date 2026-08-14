@@ -499,7 +499,7 @@ const namaPengguna = computed(() => {
         <p class="font-body-lg text-body-lg text-white/90 md:text-on-surface-variant max-w-lg leading-relaxed">
           Memberikan ketenangan pikiran bagi orang tua dengan layanan antar jemput sekolah yang profesional, terpantau secara real-time, dan mengutamakan keselamatan.
         </p>
-        <div class="flex flex-wrap gap-4 mt-2">
+        <div class="flex flex-wrap justify-center md:justify-start gap-4 mt-2">
           <button
             type="button"
             @click="bukaTombolHero"
