@@ -503,12 +503,12 @@ const namaPengguna = computed(() => {
           <button
             type="button"
             @click="bukaTombolHero"
-            class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-xl px-6 py-3 transition-colors shadow-md border-0 cursor-pointer"
+            class="w-[230px] text-center bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-xl px-6 py-3 transition-colors shadow-md border-0 cursor-pointer"
           >
             {{ labelTombolHero }}
           </button>
           <router-link to="/tentang">
-            <button class="border-2 border-solid border-primary text-primary md:text-primary bg-white/90 md:bg-transparent font-label-md text-label-md rounded-xl px-6 py-3 hover:bg-brand-tosca-light transition-colors cursor-pointer">
+            <button class="w-[230px] text-center border-2 border-solid border-primary text-primary md:text-primary bg-white/90 md:bg-transparent font-label-md text-label-md rounded-xl px-6 py-3 hover:bg-brand-tosca-light transition-colors cursor-pointer">
               Pelajari Lebih Lanjut
             </button>
           </router-link>
