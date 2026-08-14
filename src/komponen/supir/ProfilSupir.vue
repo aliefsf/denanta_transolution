@@ -143,6 +143,7 @@ const muatDataDiam = async () => {
 
 let saluranSupir: { unsubscribe: () => void } | null = null;
 let saluranPengguna: { unsubscribe: () => void } | null = null;
+let saluranPenilaian: { unsubscribe: () => void } | null = null;
 
 onMounted(() => {
   muatData();
@@ -150,6 +151,9 @@ onMounted(() => {
   if (id) {
     saluranSupir = gunakanRealtimeSubscription('supir', `id=eq.${id}`, muatDataDiam);
     saluranPengguna = gunakanRealtimeSubscription('pengguna', `id=eq.${id}`, muatDataDiam);
+    // Rating baru dari orang tua (penilaian selesai perjalanan) langsung
+    // memperbarui rata-rata & daftar ulasan di sini tanpa refresh.
+    saluranPenilaian = gunakanRealtimeSubscription('penilaian', `supir_id=eq.${id}`, muatDataDiam);
   }
 });
 
@@ -158,6 +162,8 @@ onUnmounted(() => {
   saluranSupir = null;
   saluranPengguna?.unsubscribe();
   saluranPengguna = null;
+  saluranPenilaian?.unsubscribe();
+  saluranPenilaian = null;
 });
 
 const simpanProfil = async () => {

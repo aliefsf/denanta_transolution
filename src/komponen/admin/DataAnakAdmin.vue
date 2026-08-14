@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Trash2, Eye, MapPin, Phone, User, Loader2, AlertTriangle, Search } from 'lucide-vue-next';
 import ModalUtama from '../umum/ModalUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import { ambilDaftarAnak, hapusAnakAdmin, type AnakDenganRingkasan } from '../../layanan/adminLayanan';
+import { pantauTabelAdminRealtime } from '../../layanan/realtimeLayanan';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 
 // Toast Alert
@@ -32,7 +33,26 @@ const muatDaftarAnak = async () => {
   }
 };
 
-onMounted(muatDaftarAnak);
+// Realtime: refetch begitu ada perubahan pada tabel `anak` (pendaftaran anak
+// baru oleh orang tua, edit data, aktif/nonaktif) ATAU `langganan` (status
+// aktif/lunas yang menentukan badge "Aktif" di daftar ini) -- sama seperti
+// pola di DataSupirAdmin.vue/DataSekolahAdmin.vue. Event-driven, bukan
+// interval berkala.
+let saluranAnak: { unsubscribe: () => void } | null = null;
+let saluranLangganan: { unsubscribe: () => void } | null = null;
+
+onMounted(() => {
+  muatDaftarAnak();
+  saluranAnak = pantauTabelAdminRealtime('anak', muatDaftarAnak);
+  saluranLangganan = pantauTabelAdminRealtime('langganan', muatDaftarAnak);
+});
+
+onUnmounted(() => {
+  saluranAnak?.unsubscribe();
+  saluranAnak = null;
+  saluranLangganan?.unsubscribe();
+  saluranLangganan = null;
+});
 
 // Filters
 const filterSekolah = ref('semua');

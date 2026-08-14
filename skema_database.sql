@@ -2594,3 +2594,50 @@ EXECUTE FUNCTION akumulasi_jarak_perjalanan_supir();
 -- lebih fleksibel kalau suatu saat perlu urutan/expiry.
 -- ==========================================
 ALTER TABLE perjalanan ADD COLUMN IF NOT EXISTS alamat_diperbarui_pada timestamptz;
+
+-- ==========================================
+-- MIGRASI: DAFTARKAN SISA TABEL YANG SUDAH DILANGGANI KODE FRONTEND KE
+-- PUBLICATION `supabase_realtime`, TAPI BELUM PERNAH DITAMBAHKAN. Sama
+-- seperti migrasi `perjalanan`/`pembayaran`/`supir`/`laporan_kendala` di
+-- atas -- tanpa didaftarkan ke publication ini, event postgres_changes
+-- TIDAK PERNAH terkirim ke client manapun sekalipun kode composable/
+-- komponen sudah memanggil .channel().on('postgres_changes', ...) dengan
+-- benar (status subscription tetap "SUBSCRIBED", tapi payload perubahan
+-- tidak pernah datang -- gagal senyap, tidak ada error yang kelihatan di
+-- console). Audit menemukan 12 tabel begini, masing-masing sudah dipanggil
+-- dari sisi frontend tapi belum pernah didaftarkan di sisi database:
+--   - notifikasi                  : pantauNotifikasiRealtime
+--     (useNotifikasiPengguna.ts, useDataOrangTua.ts) -- badge lonceng &
+--     daftar notifikasi Admin/Supir/Orang Tua TIDAK update otomatis.
+--   - langganan                   : pantauLanggananAnakRealtime
+--     (useDataOrangTua.ts) -- kartu status langganan Orang Tua tidak
+--     berubah otomatis setelah Admin/webhook Midtrans melunasi.
+--   - anak, pengguna               : DaftarPenggunaAdmin.vue,
+--     DataSupirAdmin.vue, DashboardAdmin.vue.
+--   - sekolah, kelas_sekolah        : DataSekolahAdmin.vue.
+--   - hari_libur, pengaturan_tarif  : KelolaJadwalAdmin.vue,
+--     PengaturanAdmin.vue.
+--   - pengajuan_cuti, pengajuan_absen, pengajuan_perubahan_jadwal,
+--     penundaan_pembayaran        : JadwalOrangTua.vue,
+--     KelolaJadwalAdmin.vue, PenugasanAdmin.vue, DaftarPenggunaAdmin.vue.
+--   - penilaian                    : ProfilSupir.vue -- rating baru dari
+--     orang tua langsung memperbarui rata-rata & daftar ulasan supir.
+-- ==========================================
+DO $$
+DECLARE
+  tabel_target text;
+BEGIN
+  FOREACH tabel_target IN ARRAY ARRAY[
+    'notifikasi', 'langganan', 'anak', 'pengguna', 'sekolah', 'kelas_sekolah',
+    'hari_libur', 'pengaturan_tarif', 'pengajuan_cuti', 'pengajuan_absen',
+    'pengajuan_perubahan_jadwal', 'penundaan_pembayaran', 'penilaian'
+  ]
+  LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = tabel_target
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tabel_target);
+    END IF;
+  END LOOP;
+END $$;
