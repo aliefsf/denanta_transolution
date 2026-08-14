@@ -101,7 +101,10 @@ const namaPengguna = computed(() => {
   <div class="bg-background text-on-surface font-body-md overflow-x-hidden min-h-screen pt-24">
 
     <!-- TopNavBar -->
-    <nav class="bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant/30 shadow-sm fixed top-0 left-0 w-full z-50">
+    <nav
+      class="bg-surface-container-lowest dark:bg-surface-dim border-b border-outline-variant/30 shadow-sm fixed top-0 left-0 w-full z-50 transition-transform duration-300"
+      :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }"
+    >
       <div class="flex justify-between items-center h-20 px-margin-mobile md:px-margin-desktop max-w-[1280px] mx-auto">
         <!-- Logo -->
         <div class="flex items-center cursor-pointer" @click="navigasiKe('/')">
@@ -180,6 +183,12 @@ const namaPengguna = computed(() => {
       </div>
     </nav>
 
+    <!-- Backdrop + sidebar di-Teleport ke <body> supaya benar-benar fixed ke
+         viewport asli (bukan ancestor yang sekarang punya transform di
+         bawah), dan tidak ikut ter-geser saat kontennya bergeser (lihat
+         pembungkus "kontenGeser" di bawah, mengikuti pola yang sama seperti
+         di HalamanUtama.vue). -->
+    <Teleport to="body">
     <!-- Mobile Sidebar Backdrop -->
     <div
       v-if="menuTerbuka"
@@ -189,7 +198,7 @@ const namaPengguna = computed(() => {
 
     <!-- Mobile Sidebar Drawer -->
     <aside
-      class="md:hidden fixed top-0 bottom-0 right-0 w-72 max-w-[80vw] bg-surface-container-lowest z-50 border-l border-outline-variant/30 flex flex-col transition-transform duration-300 shadow-xl"
+      class="md:hidden fixed top-0 bottom-0 right-0 w-72 bg-surface-container-lowest z-50 border-l border-outline-variant/30 flex flex-col transition-transform duration-300 shadow-xl"
       :class="menuTerbuka ? 'translate-x-0' : 'translate-x-full'"
     >
       <div class="h-20 flex items-center justify-between px-margin-mobile border-b border-outline-variant/30 flex-shrink-0">
@@ -246,6 +255,11 @@ const namaPengguna = computed(() => {
         </div>
       </div>
     </aside>
+    </Teleport>
+
+    <!-- Konten geser (Page Header Banner s.d. Footer) -- ikut bergeser ke
+         kiri saat sidebar dibuka, sama seperti di HalamanUtama.vue. -->
+    <div class="transition-transform duration-300" :style="{ transform: menuTerbuka ? 'translateX(-18rem)' : 'none' }">
 
     <!-- Page Header Banner -->
     <header class="relative bg-gradient-to-br from-primary via-primary to-[#0a5a4c] py-12 md:py-16 px-margin-mobile md:px-margin-desktop overflow-hidden">
@@ -419,6 +433,8 @@ const namaPengguna = computed(() => {
     </main>
 
     <FooterPublik />
+
+    </div>
 
   </div>
 </template>
