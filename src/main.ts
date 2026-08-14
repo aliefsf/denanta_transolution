@@ -4,6 +4,16 @@ import router from './rute';
 import './aset/css/gaya.css';
 import App from './App.vue';
 
+// Nonaktifkan restorasi scroll otomatis bawaan browser -- tanpa ini, saat
+// halaman di-refresh (F5) browser mengingat & mengembalikan posisi scroll
+// terakhir sebelum refresh (mis. landing page yang sempat di-scroll ke
+// bawah dekat footer/FAQ akan tetap terbuka di posisi itu setelah refresh,
+// bukan dari atas). Anchor hash di URL (mis. /#faq) tetap discroll browser
+// secara native, tidak terpengaruh setelan ini.
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+
 function tampilkanKesalahanFatal(pesan: string) {
   const root = document.getElementById('app');
   if (!root) return;
