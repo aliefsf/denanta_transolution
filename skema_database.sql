@@ -2668,3 +2668,24 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- ==========================================
+-- MIGRASI: TANDAI KAPAN `sedang_bertugas` DIAKTIFKAN (Bug Fix: Marker Peta
+-- Pemantauan Global "Nyangkut" Melewati Pergantian Hari). Sebelumnya
+-- `sedang_bertugas` HANYA pernah di-set false lagi lewat dua jalur:
+-- (1) supir menandai SELURUH tugas sesi hari itu selesai (TugasSupir.vue ->
+-- perbaruiStatusBertugas(false)), atau (2) supir menandai diri "Tidak
+-- Bertugas" (TataLetakSupir.vue). Kalau supir menutup tab/keluar tanpa
+-- pernah memicu salah satu dari itu (mis. sesi demo/simulasi yang berakhir
+-- begitu saja), kolom ini tetap TRUE selamanya -- ambilPosisiSupirAktif()
+-- (adminLayanan.ts) yang hanya memfilter `sedang_bertugas = true` (tanpa
+-- syarat tanggal) akan terus menampilkan marker supir itu di peta
+-- Pemantauan Global Admin, bahkan berhari-hari kemudian, walau tugas
+-- hari itu sudah lama "reset" otomatis di sisi tampilan Supir sendiri.
+-- Kolom baru ini dicatat setiap kali sedang_bertugas di-set true
+-- (perbaruiStatusBertugas, supirLayanan.ts) -- ambilPosisiSupirAktif() &
+-- query serupa di orangTuaLayanan.ts sekarang JUGA mensyaratkan kolom ini
+-- >= awal hari WIB ini, jadi begitu tanggal berganti, marker otomatis
+-- tidak lagi dianggap aktif tanpa perlu supir melakukan apa pun.
+-- ==========================================
+ALTER TABLE supir ADD COLUMN IF NOT EXISTS sedang_bertugas_diaktifkan_pada timestamptz;

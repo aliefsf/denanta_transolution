@@ -6,6 +6,7 @@ import { ambilPosisiSupirAktif, type PosisiSupirPeta } from '../../layanan/admin
 import { pantauTabelAdminRealtime } from '../../layanan/realtimeLayanan';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 import { warnaUntukSupir } from '../../bantuan/warnaSupir';
+import { useResetHariBerganti } from '../../komposabel/useResetHariBerganti';
 
 // Filter States
 const filterSekolah = ref('semua');
@@ -77,6 +78,14 @@ onMounted(() => {
   muatPosisiSupir();
   saluranSupir = pantauTabelAdminRealtime('supir', tanganiPerubahanSupir);
 });
+
+// Tanpa ini, marker supir yang lupa menandai tugasnya selesai baru hilang
+// dari peta begitu ADA perubahan lain pada tabel `supir` yang memicu
+// refetch (lihat tanganiPerubahanSupir) -- bisa saja tidak terjadi sama
+// sekali sampai lama setelah tengah malam. Ini memastikan peta ikut
+// menyegarkan diri TEPAT saat tanggal WIB berganti, sama seperti halaman
+// "tugas hari ini" milik Supir.
+useResetHariBerganti(muatPosisiSupir);
 
 onUnmounted(() => {
   saluranSupir?.unsubscribe();

@@ -9,6 +9,7 @@ import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import PemilihPeta from '../umum/PemilihPeta.vue';
 import BadgeStatusAnak from './BadgeStatusAnak.vue';
 import { useDataOrangTua } from '../../komposabel/useDataOrangTua';
+import { useResetHariBerganti } from '../../komposabel/useResetHariBerganti';
 import { petakanAnakTampilan } from '../../bantuan/petakanAnak';
 import { ambilDaftarSekolah, unggahFotoAnak } from '../../layanan/berlangganganLayanan';
 import { perbaruiDataAnak } from '../../layanan/orangTuaLayanan';
@@ -53,6 +54,12 @@ const daftarAnak = computed<AnakTampilan[]>(() =>
 onMounted(() => {
   if (!sudahDimuat.value) muatSemua();
 });
+
+// Menyegarkan data tepat saat tanggal WIB berganti -- tanpa ini, marker
+// "sedang bertugas" supir (dan status perjalanan hari ini) bisa tetap
+// menempel di layar melewati tengah malam sampai ada event realtime lain
+// yang kebetulan lewat. Sama seperti pola di TugasSupir.vue/DashboardSupir.vue.
+useResetHariBerganti(muatSemua);
 
 const detailAnak = (anak: AnakTampilan) => {
   emit('buka-detail', anak);

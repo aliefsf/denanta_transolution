@@ -759,9 +759,22 @@ export async function perbaruiStatusBertugas(sedangBertugas: boolean): Promise<v
   const client = klienWajibAda();
   const supirId = await idSupirWajibAda();
 
+  // sedang_bertugas_diaktifkan_pada dicatat HANYA saat diaktifkan (true) --
+  // dibaca ambilPosisiSupirAktif()/orangTuaLayanan.ts untuk memastikan
+  // marker peta otomatis dianggap tidak aktif lagi begitu tanggal WIB
+  // berganti, sekalipun supir lupa/tidak sempat menandai tugasnya selesai.
+  // Pakai ambilWaktuSekarang() (BUKAN new Date() polos) supaya konsisten
+  // ikut waktu simulasi kalau sedang dipakai demo.
+  const payload: { sedang_bertugas: boolean; sedang_bertugas_diaktifkan_pada?: string } = {
+    sedang_bertugas: sedangBertugas
+  };
+  if (sedangBertugas) {
+    payload.sedang_bertugas_diaktifkan_pada = ambilWaktuSekarang().toISOString();
+  }
+
   const { error } = await client
     .from('supir')
-    .update({ sedang_bertugas: sedangBertugas })
+    .update(payload)
     .eq('id', supirId);
   if (error) throw error;
 }

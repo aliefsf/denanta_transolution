@@ -300,7 +300,7 @@ async function lengkapiNamaSupir(perjalananList: PerjalananRow[]): Promise<Perja
 
   const [{ data: penggunaSupir, error: errPengguna }, { data: supirData, error: errSupir }] = await Promise.all([
     client.from('pengguna').select('id, nama_lengkap, nomor_telepon, foto_profil').in('id', supirIds),
-    client.from('supir').select('id, sedang_bertugas').in('id', supirIds)
+    client.from('supir').select('id, sedang_bertugas, sedang_bertugas_diaktifkan_pada').in('id', supirIds)
   ]);
   if (errPengguna) throw errPengguna;
   if (errSupir) throw errSupir;
@@ -311,7 +311,21 @@ async function lengkapiNamaSupir(perjalananList: PerjalananRow[]): Promise<Perja
       { nama: p.nama_lengkap, telepon: p.nomor_telepon, foto: p.foto_profil }
     ])
   );
-  const petaBertugas = new Map((supirData ?? []).map((s: any) => [s.id, !!s.sedang_bertugas]));
+  // Sama seperti ambilPosisiSupirAktif() (adminLayanan.ts) -- sedang_bertugas
+  // TRUE saja tidak cukup, harus juga diaktifkan HARI INI (WIB). Tanpa syarat
+  // ini, marker armada di peta Pantau Anak bisa tetap "nyangkut" aktif
+  // melewati pergantian hari kalau supir lupa menandai tugasnya selesai.
+  // Dibandingkan sebagai Date (BUKAN string mentah) -- dua representasi
+  // timestamptz dengan offset zona berbeda (mis. "...+00:00" dari Postgres
+  // vs "...+07:00" di sini) tidak bisa dibandingkan lewat perbandingan
+  // string biasa, hasilnya bisa salah walau menunjuk waktu yang sama/dekat.
+  const awalHariIniWibMs = new Date(`${ambilTanggalWibSekarang()}T00:00:00+07:00`).getTime();
+  const petaBertugas = new Map(
+    (supirData ?? []).map((s: any) => [
+      s.id,
+      !!s.sedang_bertugas && !!s.sedang_bertugas_diaktifkan_pada && new Date(s.sedang_bertugas_diaktifkan_pada).getTime() >= awalHariIniWibMs
+    ])
+  );
 
   return perjalananList.map((p) => ({
     ...p,

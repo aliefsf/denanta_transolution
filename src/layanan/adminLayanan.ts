@@ -86,10 +86,16 @@ export async function ambilPosisiSupirAktif(): Promise<PosisiSupirPeta[]> {
   const client = klienWajibAda();
   const hariIni = ambilTanggalWibSekarang();
 
+  // Syarat tambahan sedang_bertugas_diaktifkan_pada >= awal hari WIB ini --
+  // tanpa ini, supir yang lupa/tidak sempat menandai tugasnya selesai
+  // (mis. sesi demo yang berakhir begitu saja) akan tetap muncul di peta
+  // ini SELAMANYA sampai baris `supir`-nya berubah lagi, walau sudah lewat
+  // berhari-hari (lihat catatan migrasi kolom ini di skema_database.sql).
   const { data: supirData, error: errSupir } = await client
     .from('supir')
     .select('id, lintang_terkini, bujur_terkini, tersedia')
-    .eq('sedang_bertugas', true);
+    .eq('sedang_bertugas', true)
+    .gte('sedang_bertugas_diaktifkan_pada', `${hariIni}T00:00:00+07:00`);
   if (errSupir) throw errSupir;
 
   const supirIds = (supirData ?? []).map((s: any) => s.id);
