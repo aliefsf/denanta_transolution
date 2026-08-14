@@ -1183,6 +1183,33 @@ CREATE POLICY "Foto Profil: Pengguna menghapus foto miliknya sendiri"
   );
 
 -- ==========================================
+-- MIGRASI: ADMIN BOLEH MENGUNGGAH FOTO PROFIL SUPIR (Bug Fix: "Tidak
+-- memiliki izin untuk mengunggah foto profil"). unggahFotoProfilSupir()
+-- (supirLayanan.ts) dipanggil dari DataSupirAdmin.vue saat ADMIN membuat
+-- akun supir baru / mengubah foto profil supir lewat panel Admin --
+-- pengunggahnya (auth.uid() = Admin yang login) BEDA dari folder tujuan
+-- (path profile-images/{supir_id}/..., id supir yang baru dibuat/diedit),
+-- jadi selalu ditolak oleh kebijakan folder-ownership di atas (yang hanya
+-- mengizinkan (storage.foldername(name))[1] = auth.uid() milik SENDIRI).
+-- Kebijakan tambahan ini membuka INSERT/UPDATE bucket profile-images utk
+-- role admin ke folder MANAPUN, sama seperti pola admin-bypass yang sudah
+-- ada di bucket dokumen-supir.
+-- ==========================================
+DROP POLICY IF EXISTS "Foto Profil: Admin mengunggah foto pengguna manapun" ON storage.objects;
+CREATE POLICY "Foto Profil: Admin mengunggah foto pengguna manapun"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'profile-images'
+    AND dapatkan_peran_pengguna(auth.uid()) = 'admin'
+  );
+
+DROP POLICY IF EXISTS "Foto Profil: Admin memperbarui foto pengguna manapun" ON storage.objects;
+CREATE POLICY "Foto Profil: Admin memperbarui foto pengguna manapun"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'profile-images' AND dapatkan_peran_pengguna(auth.uid()) = 'admin')
+  WITH CHECK (bucket_id = 'profile-images' AND dapatkan_peran_pengguna(auth.uid()) = 'admin');
+
+-- ==========================================
 -- MIGRASI: CONSTRAINT UNIK PERJALANAN PER ANAK/TANGGAL/SESI
 -- Diperlukan supaya upsert penugasan supir (UC-A06) tidak membuat baris
 -- duplikat kalau admin menugaskan ulang anak yang sama pada tanggal & sesi
