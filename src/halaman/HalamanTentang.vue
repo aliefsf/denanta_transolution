@@ -277,7 +277,7 @@ const namaPengguna = computed(() => {
           <ChevronRight class="w-3.5 h-3.5" />
           <span class="text-white font-normal">Tentang Kami</span>
         </nav>
-        <h1 class="font-headline-lg-mobile text-[clamp(2rem,8vw,2.75rem)] leading-[1.15] md:font-display-lg md:text-display-lg md:leading-[56px] text-white mb-4">Tentang Kami</h1>
+        <h1 class="font-headline-lg-mobile text-[clamp(1.75rem,7vw,2.5rem)] font-bold leading-[1.15] md:font-display-lg md:text-display-lg md:leading-[56px] text-white mb-4">Tentang Kami</h1>
         <p class="font-body-lg text-body-lg text-white/85 max-w-2xl leading-relaxed">
           Solusi transportasi sekolah modern yang mengedepankan keamanan, transparansi, dan kenyamanan bagi anak-anak serta ketenangan pikiran bagi orang tua di Kota Padang.
         </p>
