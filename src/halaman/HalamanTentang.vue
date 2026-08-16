@@ -324,7 +324,7 @@ const namaPengguna = computed(() => {
             <Eye class="w-8 h-8" />
           </div>
           <h3 class="font-headline-md text-headline-md text-on-surface">Visi</h3>
-          <p class="text-body-lg text-secondary leading-relaxed">
+          <p class="text-body-lg text-secondary leading-relaxed text-left">
             Menjadi standar emas transportasi anak yang paling terpercaya dan inovatif di Sumatera Barat, menciptakan ekosistem perjalanan sekolah yang tanpa hambatan, aman secara mutlak, dan ramah bagi perkembangan anak.
           </p>
         </div>
