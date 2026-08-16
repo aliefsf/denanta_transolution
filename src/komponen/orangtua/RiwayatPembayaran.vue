@@ -130,33 +130,54 @@ const lanjutkanPembayaran = () => {
 };
 
 // ==========================================
-// Hentikan Langganan (2 tahap: konfirmasi -> verifikasi password)
+// Hentikan Langganan -- PER ANAK (pilih anak -> konfirmasi -> verifikasi
+// password), bukan seluruh akun sekaligus. Satu akun orang tua bisa punya
+// beberapa anak yang masing-masing berlangganan sendiri-sendiri, jadi
+// penghentian pun harus bisa menyasar satu anak saja tanpa mengganggu
+// layanan anak lain yang masih aktif pada akun yang sama.
 // ==========================================
-// Tombol hanya muncul kalau SELURUH anak terdaftar sedang aktif berlangganan
-// (tidak ada satu pun yang perlu diaktifkan ulang) -- begitu langganan
-// habis/sudah pernah dihentikan/belum pernah berlangganan sama sekali,
-// anakPerluDiaktifkan otomatis berisi entri dan tombol ini sembunyi dengan
-// sendirinya (banner "Layanan Tidak Aktif" di atas yang tampil, bukan ini).
-const bisaHentikanLangganan = computed(() => anakList.value.length > 0 && anakPerluDiaktifkan.value.length === 0);
+// Anak yang SAAT INI aktif berlangganan (kebalikan dari anakPerluDiaktifkan)
+// -- inilah daftar yang boleh dipilih untuk dihentikan. Tombol/opsi ini
+// hanya relevan kalau ada MINIMAL SATU anak aktif, bukan mensyaratkan
+// SEMUA anak aktif seperti sebelumnya.
+const anakAktifUntukDihentikan = computed(() =>
+  anakList.value.filter((a) => !anakPerluDiaktifkan.value.some((x) => x.id === a.id))
+);
+const bisaHentikanLangganan = computed(() => anakAktifUntukDihentikan.value.length > 0);
 
 const modalKonfirmasiHentikanTampil = ref(false);
 const modalPasswordHentikanTampil = ref(false);
+const anakTerpilihHenti = ref<string>('');
 const passwordVerifikasi = ref('');
 const errorPasswordVerifikasi = ref('');
 const sedangMemprosesHenti = ref(false);
 
+const namaAnakTerpilihHenti = computed(
+  () => anakAktifUntukDihentikan.value.find((a) => a.id === anakTerpilihHenti.value)?.nama_lengkap ?? ''
+);
+
 const bukaKonfirmasiHentikan = () => {
+  // Kalau cuma ada satu anak aktif, langsung pilih otomatis -- tidak perlu
+  // memaksa orang tua memilih dari daftar berisi 1 opsi saja. Kalau lebih
+  // dari satu, kosongkan dulu supaya WAJIB memilih secara sadar sebelum
+  // bisa lanjut (lihat validasi di lanjutkanKeVerifikasiPassword).
+  anakTerpilihHenti.value = anakAktifUntukDihentikan.value.length === 1 ? anakAktifUntukDihentikan.value[0].id : '';
   modalKonfirmasiHentikanTampil.value = true;
 };
 
 const batalkanHentikanLangganan = () => {
   modalKonfirmasiHentikanTampil.value = false;
   modalPasswordHentikanTampil.value = false;
+  anakTerpilihHenti.value = '';
   passwordVerifikasi.value = '';
   errorPasswordVerifikasi.value = '';
 };
 
 const lanjutkanKeVerifikasiPassword = () => {
+  if (!anakTerpilihHenti.value) {
+    picuToast('Pilih anak yang layanannya ingin dihentikan terlebih dahulu.', 'error');
+    return;
+  }
   modalKonfirmasiHentikanTampil.value = false;
   errorPasswordVerifikasi.value = '';
   passwordVerifikasi.value = '';
@@ -185,7 +206,7 @@ const lupaPasswordDariModal = async () => {
 
 const konfirmasiHentikanLangganan = async () => {
   const email = profil.value?.pengguna.email;
-  if (!email || !orangTuaId.value) return;
+  if (!email || !anakTerpilihHenti.value) return;
   if (!passwordVerifikasi.value) {
     errorPasswordVerifikasi.value = 'Password wajib diisi.';
     return;
@@ -205,19 +226,20 @@ const konfirmasiHentikanLangganan = async () => {
   }
 
   try {
-    await hentikanLangganan(orangTuaId.value);
+    const hasil = await hentikanLangganan(anakTerpilihHenti.value);
     await muatSemua();
     // WAJIB -- akunAktif (TataLetakOrangTua.vue, penentu menu sidebar
     // dikunci ke tab Pembayaran saja) dan guard router (/berlangganan)
     // membaca authStore.sudahBerlangganan/pernahBerlangganan, BUKAN state
-    // lokal useDataOrangTua.ts di atas. Tanpa refresh ini, langganan sudah
-    // benar-benar berhenti di database tapi sidebar tetap menampilkan
-    // semua menu seolah masih aktif sampai reload/login ulang.
+    // lokal useDataOrangTua.ts di atas. Kalau anak lain pada akun yang sama
+    // masih aktif, refresh ini akan menyimpulkan akun TETAP aktif (benar --
+    // penghentian ini per anak, bukan per akun), sidebar hanya terkunci
+    // begitu SEMUA anak sudah tidak aktif.
     if (authStore.pengguna?.id) {
       await authStore.periksaStatusBerlangganan(authStore.pengguna.id);
     }
     batalkanHentikanLangganan();
-    picuToast('Langganan Anda berhasil dihentikan. Layanan antar jemput saat ini sudah tidak aktif.', 'sukses');
+    picuToast(`Langganan untuk ${hasil.namaAnak} berhasil dihentikan. Layanan antar jemput untuk ${hasil.namaAnak} saat ini sudah tidak aktif.`, 'sukses');
   } catch (err: any) {
     picuToast(err.message || 'Gagal menghentikan langganan. Silakan coba lagi.', 'error');
   } finally {
@@ -929,11 +951,29 @@ const ajukanPenundaan = async () => {
           Apakah Anda yakin ingin menghentikan layanan antar jemput ini?
         </p>
 
+        <!-- Pemilihan anak: cuma tampil kalau ada LEBIH DARI SATU anak aktif
+             -- kalau cuma satu, sudah otomatis terpilih (lihat
+             bukaKonfirmasiHentikan) dan namanya cukup disebut di pesan info
+             di bawah tanpa perlu memilih apa-apa lagi. -->
+        <div v-if="anakAktifUntukDihentikan.length > 1" class="space-y-1.5">
+          <label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">Pilih Anak yang Layanannya Ingin Dihentikan:</label>
+          <select
+            v-model="anakTerpilihHenti"
+            class="w-full px-3 py-2 bg-surface-bright border border-outline-variant rounded-xl text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"
+          >
+            <option value="" disabled>-- Pilih anak --</option>
+            <option v-for="a in anakAktifUntukDihentikan" :key="a.id" :value="a.id">{{ a.nama_lengkap }}</option>
+          </select>
+        </div>
+        <p v-else-if="namaAnakTerpilihHenti" class="text-on-surface-variant leading-relaxed">
+          Layanan yang akan dihentikan: <strong class="text-on-surface">{{ namaAnakTerpilihHenti }}</strong>
+        </p>
+
         <ul class="space-y-2 text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-4 leading-relaxed list-disc pl-8">
-          <li>Layanan antar jemput akan dihentikan.</li>
-          <li>Jadwal perjalanan berikutnya tidak akan dibuat.</li>
-          <li>Anda tidak dapat menggunakan fitur monitoring setelah layanan dihentikan.</li>
-          <li>Jika ingin menggunakan layanan kembali, Anda harus melakukan proses berlangganan ulang.</li>
+          <li>Layanan antar jemput untuk anak ini akan dihentikan.</li>
+          <li>Jadwal perjalanan berikutnya untuk anak ini tidak akan dibuat.</li>
+          <li>Anda tidak dapat menggunakan fitur monitoring untuk anak ini setelah layanan dihentikan.</li>
+          <li>Jika ingin menggunakan layanan kembali, Anda harus melakukan proses berlangganan ulang untuk anak ini.</li>
         </ul>
       </div>
 
