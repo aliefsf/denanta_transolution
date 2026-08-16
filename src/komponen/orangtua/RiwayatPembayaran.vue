@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Download, AlertTriangle, FileText, Send, CalendarClock, CheckCircle2, RefreshCw, X, Trash2 } from 'lucide-vue-next';
+import { Download, AlertTriangle, FileText, Send, CalendarClock, CheckCircle2, RefreshCw, X, Trash2, ShieldAlert, Lock } from 'lucide-vue-next';
 import { supabase } from '../../layanan/supabase';
 import { prosesPembayaranMidtrans } from '../../layanan/midtransLayanan';
 import { formatMataUang } from '../../bantuan/formatMataUang';
@@ -14,6 +14,7 @@ import MemuatUtama from '../umum/MemuatUtama.vue';
 import BadgeStatusPembayaran from './BadgeStatusPembayaran.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import { useDataOrangTua } from '../../komposabel/useDataOrangTua';
+import { useAuth } from '../../komposabel/useAuth';
 import {
   ajukanPenundaanPembayaran,
   ambilPenundaanPembayaran,
@@ -22,10 +23,12 @@ import {
   unggahBuktiPenundaan,
   hapusPembayaran
 } from '../../layanan/orangTuaLayanan';
+import { hentikanLangganan } from '../../layanan/berlangganganLayanan';
 import { ambilWaktuSekarang, ambilTanggalWibSekarang } from '../../bantuan/waktuSimulasi';
 import type { PembayaranRow } from '../../tipe';
 
 const router = useRouter();
+const { masuk, aturUlangKataSandi } = useAuth();
 
 const {
   anakList,
@@ -122,6 +125,93 @@ const totalTagihanReaktivasi = computed(() =>
 const lanjutkanPembayaran = () => {
   if (anakPerluDiaktifkan.value.length === 0) return;
   router.push({ path: '/berlangganan', query: { tambah: '1' } });
+};
+
+// ==========================================
+// Hentikan Langganan (2 tahap: konfirmasi -> verifikasi password)
+// ==========================================
+// Tombol hanya muncul kalau SELURUH anak terdaftar sedang aktif berlangganan
+// (tidak ada satu pun yang perlu diaktifkan ulang) -- begitu langganan
+// habis/sudah pernah dihentikan/belum pernah berlangganan sama sekali,
+// anakPerluDiaktifkan otomatis berisi entri dan tombol ini sembunyi dengan
+// sendirinya (banner "Layanan Tidak Aktif" di atas yang tampil, bukan ini).
+const bisaHentikanLangganan = computed(() => anakList.value.length > 0 && anakPerluDiaktifkan.value.length === 0);
+
+const modalKonfirmasiHentikanTampil = ref(false);
+const modalPasswordHentikanTampil = ref(false);
+const passwordVerifikasi = ref('');
+const errorPasswordVerifikasi = ref('');
+const sedangMemprosesHenti = ref(false);
+
+const bukaKonfirmasiHentikan = () => {
+  modalKonfirmasiHentikanTampil.value = true;
+};
+
+const batalkanHentikanLangganan = () => {
+  modalKonfirmasiHentikanTampil.value = false;
+  modalPasswordHentikanTampil.value = false;
+  passwordVerifikasi.value = '';
+  errorPasswordVerifikasi.value = '';
+};
+
+const lanjutkanKeVerifikasiPassword = () => {
+  modalKonfirmasiHentikanTampil.value = false;
+  errorPasswordVerifikasi.value = '';
+  passwordVerifikasi.value = '';
+  modalPasswordHentikanTampil.value = true;
+};
+
+// "Lupa Password" DARI DALAM modal ini sengaja TIDAK me-router.push ke
+// /lupa-kata-sandi -- rute itu meta.hanyaTamu (khusus pengguna yang BELUM
+// login), jadi kalau dipanggil di sini (pengguna sedang login) guard router
+// akan langsung memantulkannya balik ke dashboard. Panggil langsung fungsi
+// pengiriman email reset-nya di sini tanpa berpindah halaman.
+const sedangKirimResetPassword = ref(false);
+const lupaPasswordDariModal = async () => {
+  const email = profil.value?.pengguna.email;
+  if (!email) return;
+  sedangKirimResetPassword.value = true;
+  try {
+    await aturUlangKataSandi(email);
+    picuToast(`Tautan atur ulang password telah dikirim ke ${email}.`, 'sukses');
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal mengirim email atur ulang password.', 'error');
+  } finally {
+    sedangKirimResetPassword.value = false;
+  }
+};
+
+const konfirmasiHentikanLangganan = async () => {
+  const email = profil.value?.pengguna.email;
+  if (!email || !orangTuaId.value) return;
+  if (!passwordVerifikasi.value) {
+    errorPasswordVerifikasi.value = 'Password wajib diisi.';
+    return;
+  }
+
+  sedangMemprosesHenti.value = true;
+  errorPasswordVerifikasi.value = '';
+  try {
+    // Verifikasi identitas: re-autentikasi email+password akun yang sedang
+    // login. Gagal (password salah) -> masuk() throw, status langganan
+    // TIDAK disentuh sama sekali, pengguna tetap di modal ini (lihat catch).
+    await masuk(email, passwordVerifikasi.value);
+  } catch {
+    errorPasswordVerifikasi.value = 'Password yang dimasukkan tidak sesuai. Silakan coba kembali.';
+    sedangMemprosesHenti.value = false;
+    return;
+  }
+
+  try {
+    await hentikanLangganan(orangTuaId.value);
+    await muatSemua();
+    batalkanHentikanLangganan();
+    picuToast('Langganan Anda berhasil dihentikan. Layanan antar jemput saat ini sudah tidak aktif.', 'sukses');
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal menghentikan langganan. Silakan coba lagi.', 'error');
+  } finally {
+    sedangMemprosesHenti.value = false;
+  }
 };
 
 // Label jenis tagihan -- ditampilkan sebagai kolom tersendiri di tabel
@@ -712,6 +802,18 @@ const ajukanPenundaan = async () => {
                 Faktur resmi diterbitkan otomatis setiap awal bulan, sistem terintegrasi pembayaran digital instant.
               </span>
             </div>
+
+            <!-- Hentikan Langganan: hanya muncul selagi seluruh anak sedang
+                 aktif berlangganan (lihat bisaHentikanLangganan). -->
+            <TombolUtama
+              v-if="bisaHentikanLangganan"
+              tema="terang"
+              varian="garis-luar"
+              class="w-full text-[11px] py-2 !border-rose-200 !text-rose-600 hover:!bg-rose-50 gap-1.5 mt-1"
+              @click="bukaKonfirmasiHentikan"
+            >
+              <ShieldAlert class="w-3.5 h-3.5" /> Hentikan Langganan
+            </TombolUtama>
           </div>
         </KartuUtama>
       </div>
@@ -794,6 +896,89 @@ const ajukanPenundaan = async () => {
         <TombolUtama tema="terang" varian="utama" class="!bg-rose-600 hover:!bg-rose-700 gap-1.5" :nonaktif="sedangMenghapusTagihan" @click="konfirmasiHapusTagihan">
           {{ sedangMenghapusTagihan ? 'Menghapus...' : 'Ya, Hapus Tagihan' }}
           <Trash2 class="w-3.5 h-3.5" />
+        </TombolUtama>
+      </template>
+    </ModalUtama>
+
+    <!-- Modal Tahap 1: Konfirmasi Penghentian Langganan -->
+    <ModalUtama
+      tema="terang"
+      :tampil="modalKonfirmasiHentikanTampil"
+      judul="Hentikan Langganan?"
+      @tutup="batalkanHentikanLangganan"
+    >
+      <div class="space-y-4 text-xs">
+        <p class="text-on-surface-variant leading-relaxed">
+          Apakah Anda yakin ingin menghentikan layanan antar jemput ini?
+        </p>
+
+        <ul class="space-y-2 text-rose-800 bg-rose-50 border border-rose-200 rounded-xl p-4 leading-relaxed list-disc pl-8">
+          <li>Layanan antar jemput akan dihentikan.</li>
+          <li>Jadwal perjalanan berikutnya tidak akan dibuat.</li>
+          <li>Anda tidak dapat menggunakan fitur monitoring setelah layanan dihentikan.</li>
+          <li>Jika ingin menggunakan layanan kembali, Anda harus melakukan proses berlangganan ulang.</li>
+        </ul>
+      </div>
+
+      <template #footer>
+        <TombolUtama tema="terang" varian="garis-luar" @click="batalkanHentikanLangganan">Batalkan</TombolUtama>
+        <TombolUtama tema="terang" varian="utama" class="!bg-rose-600 hover:!bg-rose-700" @click="lanjutkanKeVerifikasiPassword">
+          Lanjutkan
+        </TombolUtama>
+      </template>
+    </ModalUtama>
+
+    <!-- Modal Tahap 2: Verifikasi Password -->
+    <ModalUtama
+      tema="terang"
+      :tampil="modalPasswordHentikanTampil"
+      judul="Verifikasi Password"
+      @tutup="batalkanHentikanLangganan"
+    >
+      <div class="space-y-4 text-xs">
+        <p class="text-on-surface-variant leading-relaxed">
+          Masukkan password akun Anda untuk memastikan bahwa tindakan ini dilakukan oleh pemilik akun.
+        </p>
+
+        <div class="space-y-1.5">
+          <label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wide">Password:</label>
+          <div class="relative">
+            <Lock class="w-3.5 h-3.5 text-on-surface-variant absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="password"
+              v-model="passwordVerifikasi"
+              placeholder="********"
+              autocomplete="current-password"
+              @keyup.enter="konfirmasiHentikanLangganan"
+              class="w-full pl-9 pr-3 py-2 bg-surface-bright border rounded-xl text-on-surface focus:outline-none focus:ring-1"
+              :class="errorPasswordVerifikasi ? 'border-rose-400 focus:ring-rose-300' : 'border-outline-variant focus:ring-primary-container'"
+            />
+          </div>
+          <p v-if="errorPasswordVerifikasi" class="text-[10px] text-rose-600">{{ errorPasswordVerifikasi }}</p>
+        </div>
+
+        <button
+          type="button"
+          @click="lupaPasswordDariModal"
+          :disabled="sedangKirimResetPassword"
+          class="text-primary hover:underline text-[11px] font-semibold bg-transparent border-0 p-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {{ sedangKirimResetPassword ? 'Mengirim email...' : 'Lupa Password?' }}
+        </button>
+      </div>
+
+      <template #footer>
+        <TombolUtama tema="terang" varian="garis-luar" :nonaktif="sedangMemprosesHenti" @click="batalkanHentikanLangganan">
+          Batalkan
+        </TombolUtama>
+        <TombolUtama
+          tema="terang"
+          varian="utama"
+          class="!bg-rose-600 hover:!bg-rose-700 gap-1.5"
+          :nonaktif="sedangMemprosesHenti"
+          @click="konfirmasiHentikanLangganan"
+        >
+          {{ sedangMemprosesHenti ? 'Memproses...' : 'Konfirmasi' }}
         </TombolUtama>
       </template>
     </ModalUtama>

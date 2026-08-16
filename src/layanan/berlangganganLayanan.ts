@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type { AnakRow, LanggananRow, PembayaranRow, SekolahRow } from '../tipe';
 import { ambilWaktuSekarang, ambilTanggalWibSekarang, tanggalWibDariDate } from '../bantuan/waktuSimulasi';
 import { kompresiGambar, konversiBase64KeBlob } from '../bantuan/kompresiGambar';
+import { kirimNotifikasi, kirimNotifikasiKeAdmin } from './notifikasiLayanan';
 
 function klienWajibAda() {
   if (!supabase) {
@@ -419,5 +420,116 @@ export async function ambilAnakMenungguPembayaran(orangTuaId: string): Promise<S
     anakList,
     langgananByAnakId,
     pembayaranByLanggananId
+  };
+}
+
+// ==========================================
+// Hentikan Langganan
+// ==========================================
+
+export interface HasilHentikanLangganan {
+  jumlahAnakDihentikan: number;
+  jumlahPerjalananDibatalkan: number;
+}
+
+/**
+ * Hentikan SELURUH langganan aktif milik satu akun orang tua (semua anak
+ * yang saat ini berstatus aktif), dipicu dari alur "Hentikan Langganan"
+ * (RiwayatPembayaran.vue, sudah melalui konfirmasi + verifikasi password di
+ * sisi komponen sebelum fungsi ini dipanggil).
+ *
+ * SENGAJA TIDAK menambah kolom status/enum baru pada `langganan` --
+ * mengikuti pola "tampilan setelah dihentikan = tampilan langganan habis"
+ * yang diminta: baris langganan aktif cukup di-"kadaluwarsakan" dengan
+ * memundurkan tanggal_berakhir ke kemarin, PERSIS kriteria yang sudah
+ * dipakai di mana-mana (`sudah_dibayar && tanggal_berakhir >= hariIni`,
+ * lihat authStore.periksaStatusBerlangganan, anakAktifList di
+ * useDataOrangTua.ts, dan anakPerluDiaktifkan di RiwayatPembayaran.vue) --
+ * begitu baris ini diperbarui, SELURUH gating akses (monitoring, live
+ * tracking, banner "Layanan Tidak Aktif") otomatis ikut menyesuaikan tanpa
+ * perlu logika tampilan baru sama sekali. Kolom dibatalkan_pada (migrasi
+ * terpisah di skema_database.sql) tetap dicatat sebagai jejak KAPAN &
+ * BAHWA ini penghentian sengaja oleh pengguna, bukan sekadar kedaluwarsa
+ * alami -- dipakai isi notifikasi, bukan dipakai logika gating apa pun.
+ */
+export async function hentikanLangganan(orangTuaId: string): Promise<HasilHentikanLangganan> {
+  const client = klienWajibAda();
+  const hariIni = ambilTanggalWibSekarang();
+  const kemarin = tanggalWibDariDate(new Date(new Date(`${hariIni}T00:00:00+07:00`).getTime() - 24 * 60 * 60 * 1000));
+  const sekarangIso = ambilWaktuSekarang().toISOString();
+
+  const { data: anakData, error: errAnak } = await client
+    .from('anak')
+    .select('id, nama_lengkap')
+    .eq('orang_tua_id', orangTuaId)
+    .eq('aktif', true);
+  if (errAnak) throw errAnak;
+
+  const anakIds = (anakData ?? []).map((a: any) => a.id);
+  if (anakIds.length === 0) {
+    throw new Error('Tidak ada anak terdaftar pada akun ini untuk dihentikan langganannya.');
+  }
+
+  const { data: langgananAktif, error: errLangganan } = await client
+    .from('langganan')
+    .select('id, anak_id')
+    .in('anak_id', anakIds)
+    .eq('sudah_dibayar', true)
+    .gte('tanggal_berakhir', hariIni);
+  if (errLangganan) throw errLangganan;
+
+  if (!langgananAktif || langgananAktif.length === 0) {
+    throw new Error('Tidak ada langganan aktif yang dapat dihentikan.');
+  }
+
+  const { error: errUpdateLangganan } = await client
+    .from('langganan')
+    .update({ tanggal_berakhir: kemarin, dibatalkan_pada: sekarangIso })
+    .in('id', langgananAktif.map((l: any) => l.id));
+  if (errUpdateLangganan) throw errUpdateLangganan;
+
+  // Batalkan seluruh perjalanan yang BELUM berjalan (status masih
+  // 'dijadwalkan') milik anak-anak ini -- kebijakan RLS yang mengizinkan
+  // transisi dijadwalkan->dibatalkan sudah ada (semula dibuat untuk alur
+  // cuti anak), tanpa syarat tambahan selain kepemilikan, jadi aman dipakai
+  // ulang di sini.
+  const { data: perjalananDibatalkan, error: errPerjalanan } = await client
+    .from('perjalanan')
+    .update({ status: 'dibatalkan' })
+    .in('anak_id', anakIds)
+    .eq('status', 'dijadwalkan')
+    .select('id');
+  if (errPerjalanan) throw errPerjalanan;
+
+  const namaAnakList = (anakData ?? []).map((a: any) => a.nama_lengkap).join(', ');
+
+  // Notifikasi ke akun sendiri (konfirmasi) -- gagal kirim TIDAK boleh
+  // membatalkan penghentian yang sudah berhasil tersimpan di atas.
+  try {
+    await kirimNotifikasi({
+      penggunaId: orangTuaId,
+      judul: 'Langganan Dihentikan',
+      pesan: 'Langganan Anda berhasil dihentikan. Layanan antar jemput saat ini sudah tidak aktif.',
+      tipe: 'pembayaran',
+      tipeTerkait: 'langganan'
+    });
+  } catch (err) {
+    console.error('Gagal mengirim notifikasi konfirmasi penghentian langganan:', err);
+  }
+
+  try {
+    await kirimNotifikasiKeAdmin({
+      judul: 'Pengguna Menghentikan Langganan',
+      pesan: `Pengguna menghentikan layanan langganan untuk: ${namaAnakList}.`,
+      tipe: 'pembayaran',
+      tipeTerkait: 'langganan'
+    });
+  } catch (err) {
+    console.error('Gagal mengirim notifikasi admin soal penghentian langganan:', err);
+  }
+
+  return {
+    jumlahAnakDihentikan: langgananAktif.length,
+    jumlahPerjalananDibatalkan: perjalananDibatalkan?.length ?? 0
   };
 }

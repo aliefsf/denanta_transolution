@@ -2689,3 +2689,21 @@ END $$;
 -- tidak lagi dianggap aktif tanpa perlu supir melakukan apa pun.
 -- ==========================================
 ALTER TABLE supir ADD COLUMN IF NOT EXISTS sedang_bertugas_diaktifkan_pada timestamptz;
+
+-- ==========================================
+-- MIGRASI: FITUR "HENTIKAN LANGGANAN" (Orang Tua, RiwayatPembayaran.vue).
+-- Kolom ini murni jejak audit KAPAN & BAHWA sebuah baris `langganan`
+-- diakhiri secara SENGAJA oleh pengguna (lewat konfirmasi + verifikasi
+-- password), berbeda dari kedaluwarsa alami (tanggal_berakhir lewat begitu
+-- saja tanpa aksi eksplisit). TIDAK dipakai oleh logika gating akses mana
+-- pun -- gating tetap 100% memakai kriteria yang sudah ada di seluruh
+-- aplikasi (`sudah_dibayar = true AND tanggal_berakhir >= hari ini`), yang
+-- mana proses "Hentikan Langganan" cukup memundurkan tanggal_berakhir ke
+-- kemarin supaya otomatis dianggap "sudah habis" oleh SELURUH pengecekan
+-- yang sudah ada (authStore.periksaStatusBerlangganan, anakAktifList di
+-- useDataOrangTua.ts, anakPerluDiaktifkan di RiwayatPembayaran.vue, dst) --
+-- tanpa perlu status/enum baru maupun tampilan baru sama sekali, sesuai
+-- permintaan fitur (tampilan setelah dihentikan = tampilan langganan habis).
+-- Lihat hentikanLangganan() di src/layanan/berlangganganLayanan.ts.
+-- ==========================================
+ALTER TABLE langganan ADD COLUMN IF NOT EXISTS dibatalkan_pada timestamptz;
