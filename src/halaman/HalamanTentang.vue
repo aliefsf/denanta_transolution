@@ -335,16 +335,16 @@ const namaPengguna = computed(() => {
           </div>
           <h3 class="font-headline-md text-headline-md text-on-surface">Misi</h3>
           <ul class="space-y-4 text-body-lg text-secondary list-none p-0 m-0 w-full">
-            <li class="flex flex-col items-center text-center gap-2 md:flex-row md:items-start md:text-left md:gap-3">
-              <CheckCircle class="text-primary w-6 h-6 shrink-0 md:mt-0.5" />
+            <li class="flex items-start gap-3 text-left mx-auto max-w-xs md:mx-0 md:max-w-none">
+              <CheckCircle class="text-primary w-6 h-6 shrink-0 mt-0.5" />
               <span>Menyediakan armada transportasi yang selalu dalam kondisi prima dan memenuhi standar keamanan tertinggi.</span>
             </li>
-            <li class="flex flex-col items-center text-center gap-2 md:flex-row md:items-start md:text-left md:gap-3">
-              <CheckCircle class="text-primary w-6 h-6 shrink-0 md:mt-0.5" />
+            <li class="flex items-start gap-3 text-left mx-auto max-w-xs md:mx-0 md:max-w-none">
+              <CheckCircle class="text-primary w-6 h-6 shrink-0 mt-0.5" />
               <span>Memberikan transparansi penuh kepada orang tua melalui integrasi teknologi pelacakan canggih.</span>
             </li>
-            <li class="flex flex-col items-center text-center gap-2 md:flex-row md:items-start md:text-left md:gap-3">
-              <CheckCircle class="text-primary w-6 h-6 shrink-0 md:mt-0.5" />
+            <li class="flex items-start gap-3 text-left mx-auto max-w-xs md:mx-0 md:max-w-none">
+              <CheckCircle class="text-primary w-6 h-6 shrink-0 mt-0.5" />
               <span>Merekrut dan melatih pengemudi yang tidak hanya ahli berkendara, tetapi juga memiliki etika dan keramahan tinggi.</span>
             </li>
           </ul>
