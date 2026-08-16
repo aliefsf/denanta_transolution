@@ -87,7 +87,7 @@ const formTanggalSelesaiKerja = ref('');
 const formKtp = ref<File | null>(null);
 const formSim = ref<File | null>(null);
 const formStnk = ref<File | null>(null);
-// Foto Profil (Opsional) -- pola sama seperti ProfilSupir.vue: dipilih
+// Foto Profil (Wajib) -- pola sama seperti ProfilSupir.vue: dipilih
 // lokal dulu (preview instan via URL.createObjectURL), baru benar-benar
 // diunggah setelah akun berhasil dibuat (butuh supirId hasil buatAkunSupir).
 const formFoto = ref<File | null>(null);
@@ -197,6 +197,10 @@ const tambahSupir = async () => {
     picuToast('Dokumen KTP, SIM, dan STNK wajib diunggah!', 'error');
     return;
   }
+  if (!formFoto.value) {
+    picuToast('Foto profil supir wajib diunggah!', 'error');
+    return;
+  }
   if (formTipe.value === 'sementara' && !formTanggalMulaiKerja.value) {
     picuToast('Tanggal mulai bekerja wajib diisi untuk supir tipe Sementara!', 'error');
     return;
@@ -299,7 +303,7 @@ const formEditTipe = ref<'tetap' | 'sementara'>('tetap');
 const formEditTanggalMulaiKerja = ref('');
 const formEditTanggalSelesaiKerja = ref('');
 const formEditAktif = ref(true);
-// Foto Profil (Opsional) -- fotoProfilLama dipakai sebagai fallback preview
+// Foto Profil (Wajib) -- fotoProfilLama dipakai sebagai fallback preview
 // (foto yang sudah tersimpan), formEditFotoPreview cuma terisi kalau Admin
 // memilih file baru di modal ini.
 const fotoProfilLama = ref('');
@@ -346,6 +350,10 @@ const bukaEdit = (supir: SupirDenganPengguna) => {
 
 const simpanEditSupir = async () => {
   if (!supirIdEdit.value) return;
+  if (!fotoProfilLama.value && !formEditFoto.value) {
+    picuToast('Foto profil supir wajib diunggah!', 'error');
+    return;
+  }
   if (formEditTipe.value === 'sementara' && !formEditTanggalMulaiKerja.value) {
     picuToast('Tanggal mulai bekerja wajib diisi untuk supir tipe Sementara!', 'error');
     return;
@@ -670,7 +678,7 @@ const supirTerfilter = computed(() => {
             <input ref="inputFotoTambah" type="file" accept="image/png,image/jpeg,image/jpg" class="hidden" @change="pilihFotoProfil($event, 'tambah')" />
             <TombolUtama tema="terang" varian="garis-luar" class="!py-1.5 !px-3 text-[11px] gap-1" @click.prevent="inputFotoTambah?.click()">
               <Upload class="w-3.5 h-3.5" />
-              {{ formFotoPreview ? 'Ganti Foto' : 'Unggah Foto Profil (Opsional)' }}
+              {{ formFotoPreview ? 'Ganti Foto' : 'Unggah Foto Profil (Wajib)' }}
             </TombolUtama>
             <p class="text-[10px] text-on-surface-variant">PNG/JPG, maksimal 5 MB.</p>
           </div>
@@ -830,7 +838,7 @@ const supirTerfilter = computed(() => {
             <input ref="inputFotoEdit" type="file" accept="image/png,image/jpeg,image/jpg" class="hidden" @change="pilihFotoProfil($event, 'edit')" />
             <TombolUtama tema="terang" varian="garis-luar" class="!py-1.5 !px-3 text-[11px] gap-1" @click.prevent="inputFotoEdit?.click()">
               <Upload class="w-3.5 h-3.5" />
-              {{ formEditFotoPreview || fotoProfilLama ? 'Ganti Foto' : 'Unggah Foto Profil (Opsional)' }}
+              {{ formEditFotoPreview || fotoProfilLama ? 'Ganti Foto' : 'Unggah Foto Profil (Wajib)' }}
             </TombolUtama>
             <p class="text-[10px] text-on-surface-variant">PNG/JPG, maksimal 5 MB.</p>
           </div>
