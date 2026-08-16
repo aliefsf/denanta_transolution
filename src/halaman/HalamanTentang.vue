@@ -395,21 +395,21 @@ const namaPengguna = computed(() => {
               <Gavel class="w-8 h-8" />
             </div>
             <h4 class="font-title-lg text-title-lg text-on-surface">Legalitas Usaha</h4>
-            <p class="text-body-md text-secondary leading-relaxed">Terdaftar secara resmi sebagai entitas bisnis transportasi legal dengan seluruh izin operasional yang lengkap sesuai regulasi.</p>
+            <p class="text-body-md text-secondary leading-relaxed text-left">Terdaftar secara resmi sebagai entitas bisnis transportasi legal dengan seluruh izin operasional yang lengkap sesuai regulasi.</p>
           </div>
           <div class="bg-surface-container-lowest p-6 md:p-8 rounded-2xl soft-shadow border border-solid border-outline-variant/30 flex flex-col items-center space-y-4">
             <div class="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/30 mb-2">
               <ShieldCheck class="w-8 h-8" />
             </div>
             <h4 class="font-title-lg text-title-lg text-on-surface">Verifikasi Driver</h4>
-            <p class="text-body-md text-secondary leading-relaxed">Setiap pengemudi wajib mengunggah dokumen KTP, SIM, dan STNK kendaraan yang diverifikasi langsung oleh admin sebelum diizinkan bertugas.</p>
+            <p class="text-body-md text-secondary leading-relaxed text-left">Setiap pengemudi wajib mengunggah dokumen KTP, SIM, dan STNK kendaraan yang diverifikasi langsung oleh admin sebelum diizinkan bertugas.</p>
           </div>
           <div class="bg-surface-container-lowest p-6 md:p-8 rounded-2xl soft-shadow border border-solid border-outline-variant/30 flex flex-col items-center space-y-4">
             <div class="w-16 h-16 bg-gradient-to-br from-primary to-primary-container rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/30 mb-2">
               <Shield class="w-8 h-8" />
             </div>
             <h4 class="font-title-lg text-title-lg text-on-surface">Keamanan Perjalanan</h4>
-            <p class="text-body-md text-secondary leading-relaxed">Setiap perjalanan dipantau secara real-time dan dikendarai oleh pengemudi terverifikasi untuk menjaga keselamatan anak Anda.</p>
+            <p class="text-body-md text-secondary leading-relaxed text-left">Setiap perjalanan dipantau secara real-time dan dikendarai oleh pengemudi terverifikasi untuk menjaga keselamatan anak Anda.</p>
           </div>
         </div>
       </section>
