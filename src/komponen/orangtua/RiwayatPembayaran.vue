@@ -644,8 +644,14 @@ const ajukanPenundaan = async () => {
       </div>
     </div>
 
-    <!-- 1. Deadline Alert Banner -->
-    <div v-if="jatuhTempoTerdekat" class="bg-amber-50 border border-amber-200 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 soft-shadow text-xs">
+    <!-- 1. Deadline Alert Banner -- HANYA relevan selagi langganan MASIH
+         AKTIF (anakPerluDiaktifkan kosong). Kalau langganan sudah tidak
+         aktif apa pun sebabnya (habis wajar maupun dihentikan sendiri
+         lewat "Hentikan Langganan"), banner "Layanan Tidak Aktif" di atas
+         sudah cukup -- pemberitahuan jatuh tempo di sini jadi tidak
+         relevan/membingungkan karena tanggal jatuh tempo itu milik siklus
+         langganan yang sudah tidak berlaku lagi. -->
+    <div v-if="jatuhTempoTerdekat && anakPerluDiaktifkan.length === 0" class="bg-amber-50 border border-amber-200 p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 soft-shadow text-xs">
       <div class="flex items-start gap-3">
         <AlertTriangle class="w-8 h-8 text-amber-600 flex-shrink-0 mt-0.5" />
         <div class="space-y-1 text-amber-800">
