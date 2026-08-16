@@ -1140,11 +1140,11 @@ const LABEL_ALASAN_CUTI: Record<string, string> = {
             </div>
           </div>
 
-          <!-- 2. Konfigurasi Jadwal Bulanan -->
+          <!-- 2. Konfigurasi Jadwal Mingguan -->
           <div class="bg-surface-container-lowest border border-outline-variant/30 p-5 rounded-2xl space-y-4 soft-shadow">
             <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
               <CalendarDays class="w-4 h-4 text-primary" />
-              Konfigurasi Jadwal Bulanan
+              Konfigurasi Jadwal Mingguan
             </h3>
             <p class="text-xs text-on-surface-variant">Centang hari aktif sekolah anak -- sistem otomatis menandai tanggal yang sesuai pada kalender bulan berjalan. Perubahan baru berlaku setelah tombol <strong>Simpan Perubahan Jadwal</strong> ditekan.</p>
 
