@@ -15,6 +15,7 @@ import BadgeStatusPembayaran from './BadgeStatusPembayaran.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import { useDataOrangTua } from '../../komposabel/useDataOrangTua';
 import { useAuth } from '../../komposabel/useAuth';
+import { useAuthStore } from '../../penyimpanan/authStore';
 import {
   ajukanPenundaanPembayaran,
   ambilPenundaanPembayaran,
@@ -29,6 +30,7 @@ import type { PembayaranRow } from '../../tipe';
 
 const router = useRouter();
 const { masuk, aturUlangKataSandi } = useAuth();
+const authStore = useAuthStore();
 
 const {
   anakList,
@@ -205,6 +207,15 @@ const konfirmasiHentikanLangganan = async () => {
   try {
     await hentikanLangganan(orangTuaId.value);
     await muatSemua();
+    // WAJIB -- akunAktif (TataLetakOrangTua.vue, penentu menu sidebar
+    // dikunci ke tab Pembayaran saja) dan guard router (/berlangganan)
+    // membaca authStore.sudahBerlangganan/pernahBerlangganan, BUKAN state
+    // lokal useDataOrangTua.ts di atas. Tanpa refresh ini, langganan sudah
+    // benar-benar berhenti di database tapi sidebar tetap menampilkan
+    // semua menu seolah masih aktif sampai reload/login ulang.
+    if (authStore.pengguna?.id) {
+      await authStore.periksaStatusBerlangganan(authStore.pengguna.id);
+    }
     batalkanHentikanLangganan();
     picuToast('Langganan Anda berhasil dihentikan. Layanan antar jemput saat ini sudah tidak aktif.', 'sukses');
   } catch (err: any) {
