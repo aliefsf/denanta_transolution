@@ -135,7 +135,13 @@ const namaPengguna = computed(() => {
           </button>
 
           <!-- Kondisi BELUM LOGIN -->
-          <div v-if="!isAuthenticated" class="flex items-center">
+          <div v-if="!isAuthenticated" class="flex items-center gap-2">
+            <router-link
+              to="/login"
+              class="text-on-surface-variant hover:text-primary font-label-md text-label-md rounded-full px-4 py-2.5 transition-colors cursor-pointer border-0 font-semibold inline-block bg-transparent"
+            >
+              Masuk
+            </router-link>
             <router-link
               to="/register"
               class="bg-primary hover:bg-[#0D7A68] text-on-primary font-label-md text-label-md rounded-full px-5 py-2.5 transition-colors shadow-sm cursor-pointer border-0 font-semibold inline-block"
