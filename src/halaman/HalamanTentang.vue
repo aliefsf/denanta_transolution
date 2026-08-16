@@ -69,6 +69,13 @@ const bukaMenuLangganan = () => {
 };
 
 onMounted(() => {
+  // Paksa mulai dari paling atas setiap halaman ini dimuat/di-refresh --
+  // tanpa ini, kombinasi IntersectionObserver di bawah (yang langsung
+  // memeriksa seluruh <section> saat mount) dengan perilaku scroll bawaan
+  // sebagian browser bisa membuat halaman terbuka dalam posisi ter-scroll
+  // ke bawah/dekat footer, bukan dari atas.
+  window.scrollTo(0, 0);
+
   const observerOptions = {
     threshold: 0.1
   };
