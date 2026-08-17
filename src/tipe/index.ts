@@ -345,5 +345,8 @@ export interface AnakTampilan {
   alergi: string | null;
   perjalananId: string | null;
   supirId: string | null;
-  adaKendalaHariIni?: boolean;
+  // 'aktif' = ada laporan kendala hari ini yang BELUM 'selesai', 'selesai' =
+  // semua laporan kendala hari ini sudah ditandai selesai, null/undefined =
+  // tidak ada laporan kendala sama sekali hari ini.
+  statusKendalaHariIni?: 'aktif' | 'selesai' | null;
 }

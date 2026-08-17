@@ -296,10 +296,16 @@ const simpanEditAnak = async () => {
             <div class="mt-1 flex items-center gap-2">
               <BadgeStatusAnak :status="anak.status" />
               <span
-                v-if="anak.adaKendalaHariIni"
-                class="inline-flex items-center bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-bold uppercase animate-pulse"
+                v-if="anak.statusKendalaHariIni === 'aktif'"
+                class="inline-flex items-center bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
               >
                 Ada Kendala
+              </span>
+              <span
+                v-else-if="anak.statusKendalaHariIni === 'selesai'"
+                class="inline-flex items-center bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+              >
+                Kendala Selesai
               </span>
             </div>
           </div>

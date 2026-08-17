@@ -260,7 +260,7 @@ function formatStatusSaatKejadian(status: string | null | undefined): string {
                         ? 'bg-emerald-100 text-emerald-700'
                         : kendala.status === 'ditindak'
                         ? 'bg-amber-100 text-amber-700'
-                        : 'bg-rose-100 text-rose-700 border border-rose-200 animate-pulse'
+                        : 'bg-rose-100 text-rose-700 border border-rose-200'
                     "
                   >
                     {{

@@ -33,7 +33,13 @@ export function petakanAnakTampilan(
     perjalananSore ??
     null;
 
-  const adaKendala = perjalananAnak.some((p) => p.laporan_kendala && p.laporan_kendala.length > 0);
+  const semuaKendalaHariIni = perjalananAnak.flatMap((p) => p.laporan_kendala ?? []);
+  const statusKendala: AnakTampilan['statusKendalaHariIni'] =
+    semuaKendalaHariIni.length === 0
+      ? null
+      : semuaKendalaHariIni.some((k: any) => k.status !== 'selesai')
+      ? 'aktif'
+      : 'selesai';
 
   // Marker/lacak posisi supir HANYA boleh tampil begitu supir benar-benar
   // menekan "Mulai Bertugas" -- acuannya `supirSedangBertugas` (dari kolom
@@ -72,6 +78,6 @@ export function petakanAnakTampilan(
     alergi: anak.alergi,
     perjalananId: perjalananTerbaru?.id ?? null,
     supirId: supirSedangBertugas ? perjalananTerbaru!.supir_id : null,
-    adaKendalaHariIni: adaKendala
+    statusKendalaHariIni: statusKendala
   };
 }
