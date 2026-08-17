@@ -9,8 +9,8 @@ import { ambilWaktuSekarang } from '../../bantuan/waktuSimulasi';
 import { useDataOrangTua } from '../../komposabel/useDataOrangTua';
 import type { AnakTampilan } from '../../tipe';
 import {
-  Users, Calendar,
-  ChevronRight, MessageCircle
+  Users, Calendar, AlertTriangle,
+  ChevronRight, MessageCircle, School
 } from 'lucide-vue-next';
 import KartuUtama from '../umum/KartuUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
@@ -155,6 +155,12 @@ const notifikasiTerbaru = computed(() =>
 const lihatLokasiLangsung = (anak: AnakTampilan) => {
   emit('buka-detail', anak);
 };
+
+// Widget ringkasan ke-3 -- memanfaatkan statusKendalaHariIni yang sudah
+// dipetakan petakanAnakTampilan() (lihat perbaikan badge Pantau Anak),
+// supaya orang tua langsung lihat dari dashboard kalau ada kendala yang
+// masih butuh perhatian, tanpa perlu pindah tab.
+const jumlahKendalaAktif = computed(() => daftarAnak.value.filter((a) => a.statusKendalaHariIni === 'aktif').length);
 </script>
 
 <template>
@@ -162,20 +168,25 @@ const lihatLokasiLangsung = (anak: AnakTampilan) => {
     <MemuatUtama tema="terang" :tampil="sedangMemuat" pesan="Memuat data dashboard..." />
 
     <!-- Welcome Greeting Header -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-extrabold text-on-background tracking-tight">Halo, {{ namaPengguna }}!</h1>
-        <p class="text-xs text-on-surface-variant">Selamat datang kembali di panel monitoring Denanta TranSolution.</p>
-      </div>
-      <div
-        v-if="sisaLanggananTerdekat !== null && sisaLanggananTerdekat.sisaHari <= 5"
-        class="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-4 py-2.5 rounded-xl flex items-center gap-2"
-      >
-        <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-        <span>
-          Langganan <strong>{{ sisaLanggananTerdekat.nama }}</strong> segera berakhir dalam
-          <strong>{{ sisaLanggananTerdekat.sisaHari }} hari</strong>.
-        </span>
+    <div class="relative overflow-hidden bg-gradient-to-br from-primary-container/40 via-surface-container-lowest to-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 soft-shadow">
+      <div class="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-primary/5"></div>
+      <div class="absolute -right-4 bottom-0 w-24 h-24 rounded-full bg-primary/5"></div>
+      <div class="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-primary">Portal Orang Tua</p>
+          <h1 class="text-2xl font-extrabold text-on-background tracking-tight mt-0.5">Halo, {{ namaPengguna }}!</h1>
+          <p class="text-xs text-on-surface-variant mt-1">Selamat datang kembali di panel monitoring Denanta TranSolution.</p>
+        </div>
+        <div
+          v-if="sisaLanggananTerdekat !== null && sisaLanggananTerdekat.sisaHari <= 5"
+          class="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 flex-shrink-0"
+        >
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping flex-shrink-0"></span>
+          <span>
+            Langganan <strong>{{ sisaLanggananTerdekat.nama }}</strong> segera berakhir dalam
+            <strong>{{ sisaLanggananTerdekat.sisaHari }} hari</strong>.
+          </span>
+        </div>
       </div>
     </div>
 
@@ -216,39 +227,60 @@ const lihatLokasiLangsung = (anak: AnakTampilan) => {
 
     <template v-if="daftarAnak.length > 0">
       <!-- Summary Widgets Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <!-- 1. Sisa Hari (anak dengan deadline paling dekat) -->
-        <div class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 space-y-2 soft-shadow">
-          <div class="flex justify-between items-center text-on-surface-variant text-xs font-semibold">
-            <span>Sisa Langganan</span>
-            <Calendar class="w-4 h-4 text-primary" />
+        <div class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 space-y-2 soft-shadow hover:border-primary/30 transition-colors">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Sisa Langganan</span>
+            <div class="w-9 h-9 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+              <Calendar class="w-5 h-5 text-primary" />
+            </div>
           </div>
           <template v-if="sisaLanggananTerdekat">
-            <p class="text-[10px] text-on-surface-variant">
-              Anak: <span class="font-bold text-on-surface">{{ sisaLanggananTerdekat.nama }}</span>
-            </p>
-            <p class="text-3xl font-black text-on-surface tracking-wide">
+            <p class="text-3xl font-black text-on-surface tracking-wide leading-none pt-1">
               {{ sisaLanggananTerdekat.sisaHari }}
               <span class="text-xs font-normal text-on-surface-variant">hari lagi</span>
             </p>
-            <p class="text-[10px] text-on-surface-variant">
-              Berakhir: {{ formatTanggalId(sisaLanggananTerdekat.tanggalBerakhir) }}
+            <p class="text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/20">
+              <span class="font-bold text-on-surface">{{ sisaLanggananTerdekat.nama }}</span> &middot; berakhir {{ formatTanggalId(sisaLanggananTerdekat.tanggalBerakhir) }}
             </p>
           </template>
-          <p v-else class="text-3xl font-black text-on-surface tracking-wide">-</p>
+          <p v-else class="text-3xl font-black text-on-surface tracking-wide pt-1">-</p>
         </div>
 
         <!-- 2. Anak Terdaftar -->
-        <div class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 space-y-2 soft-shadow">
-          <div class="flex justify-between items-center text-on-surface-variant text-xs font-semibold">
-            <span>Anak Terdaftar</span>
-            <Users class="w-4 h-4 text-primary" />
+        <div class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 space-y-2 soft-shadow hover:border-primary/30 transition-colors">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Anak Terdaftar</span>
+            <div class="w-9 h-9 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+              <Users class="w-5 h-5 text-primary" />
+            </div>
           </div>
-          <p class="text-3xl font-black text-on-surface tracking-wide">
+          <p class="text-3xl font-black text-on-surface tracking-wide leading-none pt-1">
             {{ daftarAnak.length }}
             <span class="text-xs font-normal text-on-surface-variant">anak</span>
           </p>
-          <p class="text-[10px] text-on-surface-variant">Terdaftar di {{ daftarAnak[0]?.sekolah ?? '-' }}</p>
+          <p class="text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/20">Terdaftar di {{ daftarAnak[0]?.sekolah ?? '-' }}</p>
+        </div>
+
+        <!-- 3. Kendala Aktif -->
+        <div class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 space-y-2 soft-shadow hover:border-primary/30 transition-colors">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant">Kendala Aktif</span>
+            <div
+              class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              :class="jumlahKendalaAktif > 0 ? 'bg-rose-100' : 'bg-primary-container/30'"
+            >
+              <AlertTriangle class="w-5 h-5" :class="jumlahKendalaAktif > 0 ? 'text-rose-600' : 'text-primary'" />
+            </div>
+          </div>
+          <p class="text-3xl font-black tracking-wide leading-none pt-1" :class="jumlahKendalaAktif > 0 ? 'text-rose-600' : 'text-on-surface'">
+            {{ jumlahKendalaAktif }}
+            <span class="text-xs font-normal text-on-surface-variant">laporan</span>
+          </p>
+          <p class="text-[10px] text-on-surface-variant pt-1 border-t border-outline-variant/20">
+            {{ jumlahKendalaAktif > 0 ? 'Belum ditandai selesai hari ini' : 'Tidak ada kendala hari ini' }}
+          </p>
         </div>
       </div>
 
@@ -282,26 +314,34 @@ const lihatLokasiLangsung = (anak: AnakTampilan) => {
             <div
               v-for="anak in daftarAnak"
               :key="anak.id"
-              class="bg-surface-container-lowest border border-outline-variant/30 p-5 rounded-2xl space-y-4 soft-shadow"
+              class="bg-surface-container-lowest border border-outline-variant/30 p-5 rounded-2xl space-y-4 soft-shadow hover:border-primary/30 transition-colors"
             >
               <div class="flex items-center gap-4">
-                <img v-if="anak.foto" :src="anak.foto" :alt="anak.nama" class="w-12 h-12 rounded-xl object-cover border border-outline-variant/30" />
-                <div v-else class="w-12 h-12 rounded-xl bg-primary-container/20 border border-outline-variant/30 flex items-center justify-center text-primary font-bold">
+                <img v-if="anak.foto" :src="anak.foto" :alt="anak.nama" class="w-14 h-14 rounded-xl object-cover border-2 border-primary-container/50 flex-shrink-0" />
+                <div v-else class="w-14 h-14 rounded-xl bg-primary-container/20 border-2 border-primary-container/50 flex items-center justify-center text-primary font-bold text-lg flex-shrink-0">
                   {{ anak.nama.charAt(0) }}
                 </div>
-                <div class="flex-grow">
+                <div class="flex-grow min-w-0">
                   <div class="flex flex-wrap items-center gap-2">
                     <h4 class="text-base font-bold text-on-surface">{{ anak.nama }}</h4>
                     <BadgeStatusAnak :status="anak.status" />
+                    <span
+                      v-if="anak.statusKendalaHariIni === 'aktif'"
+                      class="inline-flex items-center bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                    >
+                      Ada Kendala
+                    </span>
                   </div>
-                  <p class="text-xs text-on-surface-variant mt-0.5">{{ anak.sekolah }} | {{ anak.kelas }}</p>
+                  <p class="text-xs text-on-surface-variant mt-0.5 flex items-center gap-1">
+                    <School class="w-3.5 h-3.5 text-on-surface-variant flex-shrink-0" /> {{ anak.sekolah }} &middot; {{ anak.kelas }}
+                  </p>
                 </div>
               </div>
 
               <!-- Driver Info and Sisa Langganan -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-outline-variant/20 text-xs">
                 <div class="space-y-1.5 text-on-surface-variant">
-                  <p class="text-on-surface-variant">Driver Pendamping:</p>
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Driver Pendamping</p>
                   <div class="flex items-center gap-2">
                     <span class="font-bold text-on-surface">{{ anak.namaSupir || 'Belum ditugaskan' }}</span>
                     <a
@@ -317,7 +357,7 @@ const lihatLokasiLangsung = (anak: AnakTampilan) => {
                 </div>
 
                 <div v-if="sisaLanggananByAnakId.get(anak.id)" class="space-y-1.5 text-on-surface-variant md:text-right">
-                  <p class="text-on-surface-variant">Sisa Langganan:</p>
+                  <p class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Sisa Langganan</p>
                   <p>
                     <span class="font-bold text-on-surface">{{ sisaLanggananByAnakId.get(anak.id)!.sisaHari }} Hari</span>
                     <span class="text-on-surface-variant"> &middot; Berakhir {{ formatTanggalId(sisaLanggananByAnakId.get(anak.id)!.tanggalBerakhir) }}</span>
