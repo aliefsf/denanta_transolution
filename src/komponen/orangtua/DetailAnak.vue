@@ -166,6 +166,16 @@ const laporanKendalaList = computed(() => {
   return list.sort((a, b) => new Date(b.dibuat_pada).getTime() - new Date(a.dibuat_pada).getTime());
 });
 
+// Kendala yang MASIH AKTIF (belum 'selesai') ditonjolkan sebagai kartu besar
+// -- itu yang benar-benar butuh perhatian orang tua saat ini. Yang sudah
+// 'selesai' TIDAK PERNAH hilang dari database (log permanen), tapi kalau
+// tetap ditampilkan sebesar itu selamanya, halaman ini lama-lama penuh
+// kartu merah basi padahal masalahnya sudah beres -- jadi dipindah ke
+// riwayat ringkas yang bisa dilipat (lihat kendalaSelesaiList & riwayatKendalaTerbuka).
+const kendalaAktifList = computed(() => laporanKendalaList.value.filter((k) => k.status !== 'selesai'));
+const kendalaSelesaiList = computed(() => laporanKendalaList.value.filter((k) => k.status === 'selesai'));
+const riwayatKendalaTerbuka = ref(false);
+
 function formatWaktuLaporan(waktuIso: string | null | undefined): string {
   if (!waktuIso) return '-';
   const d = new Date(waktuIso);
@@ -225,10 +235,12 @@ function formatStatusSaatKejadian(status: string | null | undefined): string {
       <!-- Left (2 Columns): Map and Timeline -->
       <div class="lg:col-span-2 space-y-6">
 
-        <!-- Banner Laporan Kendala Hari Ini -->
-        <div v-if="laporanKendalaList.length > 0" class="space-y-4">
+        <!-- Banner Laporan Kendala Hari Ini -- HANYA yang masih aktif (belum
+             'selesai'); yang sudah selesai dipindah ke riwayat ringkas di
+             bawah supaya halaman ini tidak terus dipenuhi kartu merah basi. -->
+        <div v-if="kendalaAktifList.length > 0" class="space-y-4">
           <div
-            v-for="kendala in laporanKendalaList"
+            v-for="kendala in kendalaAktifList"
             :key="kendala.id"
             class="bg-rose-50/90 border border-rose-200 text-rose-900 rounded-2xl p-5 soft-shadow flex flex-col gap-3 relative overflow-hidden"
           >
@@ -281,6 +293,32 @@ function formatStatusSaatKejadian(status: string | null | undefined): string {
               <span v-if="namaSupirPelapor(kendala.perjalanan_id)">
                 <strong>Supir Pelapor:</strong> {{ namaSupirPelapor(kendala.perjalanan_id) }}
               </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Riwayat Kendala Sudah Selesai -- dilipat default, cuma ringkasan
+             satu baris per laporan supaya tetap tercatat tanpa memenuhi
+             halaman dengan kartu besar utk masalah yang sudah beres. -->
+        <div v-if="kendalaSelesaiList.length > 0" class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl overflow-hidden soft-shadow">
+          <button
+            type="button"
+            @click="riwayatKendalaTerbuka = !riwayatKendalaTerbuka"
+            class="w-full flex items-center justify-between gap-2 px-4 py-3 text-xs font-bold text-on-surface-variant hover:bg-surface-container/40 transition-colors cursor-pointer"
+          >
+            <span class="flex items-center gap-1.5">
+              <Check class="w-3.5 h-3.5 text-emerald-600" />
+              Riwayat Kendala Selesai Hari Ini ({{ kendalaSelesaiList.length }})
+            </span>
+            <span class="text-[10px] text-primary">{{ riwayatKendalaTerbuka ? 'Sembunyikan' : 'Lihat' }}</span>
+          </button>
+          <div v-if="riwayatKendalaTerbuka" class="divide-y divide-outline-variant/20 border-t border-outline-variant/20">
+            <div v-for="kendala in kendalaSelesaiList" :key="kendala.id" class="px-4 py-2.5 text-[11px] flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-emerald-50 text-emerald-700">Selesai</span>
+              <span class="font-semibold text-on-surface">{{ kendala.kategori === 'kendala_anak' ? 'Kendala Anak' : 'Kendala Perjalanan' }}</span>
+              <span class="text-on-surface-variant">-- {{ formatSesi(kendala.perjalanan_id) }}</span>
+              <span class="text-on-surface-variant">-- {{ kendala.deskripsi }}</span>
+              <span class="text-on-surface-variant font-mono ml-auto">{{ formatWaktuLaporan(kendala.dibuat_pada) }}</span>
             </div>
           </div>
         </div>
