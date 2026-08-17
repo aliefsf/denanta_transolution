@@ -153,14 +153,28 @@ async function hitungTugasUntukTanggalAktif(client: NonNullable<typeof supabase>
   // tetap terhitung sebagai "sudah dapat tugas" dan mengunci absensi
   // selamanya, padahal halaman "Tugas Hari Ini" sudah benar menampilkan
   // kosong untuk baris yang sama.
-  const { count, error } = await client
+  const { data, error } = await client
     .from('perjalanan')
-    .select('id', { count: 'exact', head: true })
+    .select('id, anak_id, anak(aktif)')
     .eq('supir_id', supirId)
     .eq('tanggal_perjalanan', tanggalAktif)
     .neq('status', 'dibatalkan');
   if (error) throw error;
-  return count ?? 0;
+
+  // Saring anak yang sudah tidak aktif ATAU langganannya belum lunas/sudah
+  // kedaluwarsa -- WAJIB sama persis dengan penyaringan di
+  // ambilTugasHariIni() (bawah) dan ambilPenugasanHariIni() (adminLayanan.ts).
+  // Tanpa ini, baris `perjalanan` "yatim" yang terlanjur ada sebelum anaknya
+  // dinonaktifkan/langganannya berakhir tetap terhitung "sudah dapat tugas"
+  // dan mengunci absensi selamanya -- padahal halaman "Tugas Hari Ini" dan
+  // Penugasan Admin sudah benar-benar menyembunyikannya sebagai kosong,
+  // sehingga supir terjebak "terkunci" tanpa tugas yang benar-benar terlihat
+  // di mana pun.
+  const barisMentah = (data ?? []) as any[];
+  const anakAktifMentah = barisMentah.filter((p) => p.anak?.aktif === true);
+  const anakIds = Array.from(new Set(anakAktifMentah.map((p) => p.anak_id)));
+  const anakIdBerlangganan = await ambilAnakIdBerlanggananAktif(client, anakIds, tanggalAktif);
+  return anakAktifMentah.filter((p) => anakIdBerlangganan.has(p.anak_id)).length;
 }
 
 export async function ambilStatusKehadiran(): Promise<StatusKehadiran> {
