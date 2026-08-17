@@ -7,7 +7,7 @@ import ModalUtama from '../umum/ModalUtama.vue';
 import { useDataOrangTua } from '../../komposabel/useDataOrangTua';
 import { formatWaktuRelatif } from '../../bantuan/formatWaktuRelatif';
 import { tandaiNotifikasiDibaca, tandaiSemuaNotifikasiDibaca } from '../../layanan/notifikasiLayanan';
-import { infoTampilanNotifikasi } from '../../bantuan/notifikasiTampilan';
+import { infoTampilanNotifikasi, warnaGarisNotifikasi } from '../../bantuan/notifikasiTampilan';
 
 const {
   notifikasiList,
@@ -189,7 +189,7 @@ const konfirmasiBersihkanSemua = async () => {
         ]"
       >
         <!-- Unread Dot -->
-        <span v-if="!notif.dibaca" class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></span>
+        <span v-if="!notif.dibaca" class="absolute left-0 top-0 bottom-0 w-1" :class="warnaGarisNotifikasi(notif.tampilan.sentimen)"></span>
 
         <!-- Icon -- per KEJADIAN SPESIFIK (mis. status perjalanan/penundaan
              disetujui-ditolak), bukan cuma kategori umum, supaya info paling

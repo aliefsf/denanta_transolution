@@ -5,7 +5,7 @@ import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import MemuatUtama from '../umum/MemuatUtama.vue';
 import ModalUtama from '../umum/ModalUtama.vue';
 import { formatWaktuRelatif } from '../../bantuan/formatWaktuRelatif';
-import { infoTampilanNotifikasi } from '../../bantuan/notifikasiTampilan';
+import { infoTampilanNotifikasi, warnaGarisNotifikasi } from '../../bantuan/notifikasiTampilan';
 import { useNotifikasiPengguna } from '../../komposabel/useNotifikasiPengguna';
 
 const {
@@ -182,7 +182,7 @@ const konfirmasiBersihkanSemua = async () => {
         ]"
       >
         <!-- Unread Dot -->
-        <span v-if="!notif.dibaca" class="absolute left-0 top-0 bottom-0 w-1 bg-primary"></span>
+        <span v-if="!notif.dibaca" class="absolute left-0 top-0 bottom-0 w-1" :class="warnaGarisNotifikasi(notif.tampilan.sentimen)"></span>
 
         <!-- Icon -- per kejadian spesifik, lihat notifikasiTampilan.ts -->
         <div
