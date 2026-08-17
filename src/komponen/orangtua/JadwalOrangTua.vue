@@ -1259,7 +1259,7 @@ const LABEL_ALASAN_CUTI: Record<string, string> = {
             </div>
 
             <fieldset :disabled="!jendelaPerubahanJadwalTerbuka" class="contents">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div class="md:col-span-2">
                 <label class="block text-[10px] font-bold text-on-surface-variant uppercase mb-1.5">Pilih Anak:</label>
                 <select
