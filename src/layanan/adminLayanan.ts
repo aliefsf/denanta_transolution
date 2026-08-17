@@ -1117,7 +1117,7 @@ export async function buatPenugasan(params: {
 
   const { data: anakList, error: errAnak } = await client
     .from('anak')
-    .select('id, jenis_layanan')
+    .select('id, jenis_layanan, nama_lengkap, orang_tua_id')
     .in('sekolah_id', params.sekolahIds)
     .eq('aktif', true);
   if (errAnak) throw errAnak;
@@ -1140,6 +1140,19 @@ export async function buatPenugasan(params: {
   const jumlahDilewati = anakList.length - anakDitugaskan.length;
   if (anakDitugaskan.length === 0) return { jumlahDitugaskan: 0, jumlahDilewati };
 
+  // Baca supir_id LAMA (kalau ada) sebelum ditimpa -- perbandingan sebelum
+  // vs sesudah upsert inilah satu-satunya cara tahu apakah ini penugasan
+  // BARU atau PENGALIHAN dari supir lain, supaya bisa memberi tahu pihak
+  // yang terdampak (lihat blok notifikasi di bawah).
+  const anakDitugaskanIds = anakDitugaskan.map((a: any) => a.id);
+  const { data: barisLama } = await client
+    .from('perjalanan')
+    .select('anak_id, supir_id')
+    .eq('tanggal_perjalanan', params.tanggal)
+    .eq('jenis_perjalanan', params.jenisPerjalanan)
+    .in('anak_id', anakDitugaskanIds);
+  const supirLamaByAnakId = new Map((barisLama ?? []).map((b: any) => [b.anak_id, b.supir_id as string | null]));
+
   const baris = anakDitugaskan.map((a: any) => ({
     anak_id: a.id,
     supir_id: params.supirId,
@@ -1154,17 +1167,70 @@ export async function buatPenugasan(params: {
     .upsert(baris, { onConflict: 'anak_id,tanggal_perjalanan,jenis_perjalanan' });
   if (error) throw error;
 
+  const labelSesi = params.jenisPerjalanan === 'pagi' ? 'Pagi' : 'Sore';
+
   // Best-effort -- lihat catatan yang sama di fungsi lain berkas ini.
   try {
     await kirimNotifikasi({
       penggunaId: params.supirId,
       judul: 'Penugasan Rute Baru',
-      pesan: `Anda ditugaskan menjemput/mengantar ${anakDitugaskan.length} anak pada sesi ${params.jenisPerjalanan === 'pagi' ? 'Pagi' : 'Sore'} tanggal ${params.tanggal}.`,
+      pesan: `Anda ditugaskan menjemput/mengantar ${anakDitugaskan.length} anak pada sesi ${labelSesi} tanggal ${params.tanggal}.`,
       tipe: 'perjalanan',
       tipeTerkait: 'penugasan_baru'
     });
   } catch (err) {
     console.error('Gagal kirim notifikasi penugasan rute baru:', err);
+  }
+
+  // Anak yang SEBELUMNYA sudah punya supir BERBEDA -- ini kasus "ganti
+  // supir" (mis. supir lama sakit/cuti), bukan penugasan pertama kali.
+  // Tanpa blok ini, supir lama tidak pernah tahu tugasnya dialihkan (baru
+  // sadar kalau kebetulan membuka aplikasi lagi), dan orang tua tidak
+  // pernah tahu ada pergantian supir sampai hari-H.
+  const anakDialihkan = anakDitugaskan.filter((a: any) => {
+    const lama = supirLamaByAnakId.get(a.id);
+    return lama && lama !== params.supirId;
+  });
+
+  if (anakDialihkan.length > 0) {
+    const { data: supirBaruData } = await client.from('pengguna').select('nama_lengkap').eq('id', params.supirId).maybeSingle();
+    const namaSupirBaru = supirBaruData?.nama_lengkap ?? 'supir pengganti';
+
+    // Satu notifikasi per supir lama (bukan per anak) -- kalau beberapa
+    // anak yang dialihkan kebetulan berasal dari supir lama yang sama,
+    // tidak perlu membanjiri dia dengan notifikasi berulang.
+    const supirLamaIds = new Set(
+      anakDialihkan.map((a: any) => supirLamaByAnakId.get(a.id)).filter((id: any): id is string => !!id)
+    );
+    for (const supirLamaId of supirLamaIds) {
+      try {
+        await kirimNotifikasi({
+          penggunaId: supirLamaId,
+          judul: 'Penugasan Dialihkan',
+          pesan: `Sebagian tugas Anda pada sesi ${labelSesi} tanggal ${params.tanggal} telah dialihkan Admin ke supir lain.`,
+          tipe: 'perjalanan',
+          tipeTerkait: 'penugasan_dialihkan'
+        });
+      } catch (err) {
+        console.error('Gagal kirim notifikasi ke supir lama soal pengalihan tugas:', err);
+      }
+    }
+
+    for (const anak of anakDialihkan as any[]) {
+      if (!anak.orang_tua_id) continue;
+      try {
+        await kirimNotifikasi({
+          penggunaId: anak.orang_tua_id,
+          judul: 'Supir Pengganti Ditugaskan',
+          pesan: `Supir untuk ${anak.nama_lengkap} pada sesi ${labelSesi} tanggal ${params.tanggal} telah diganti menjadi ${namaSupirBaru}.`,
+          tipe: 'perjalanan',
+          idTerkait: anak.id,
+          tipeTerkait: 'penugasan_dialihkan'
+        });
+      } catch (err) {
+        console.error('Gagal kirim notifikasi ke orang tua soal pergantian supir:', err);
+      }
+    }
   }
 
   return { jumlahDitugaskan: anakDitugaskan.length, jumlahDilewati };
@@ -1237,11 +1303,27 @@ export async function tugaskanSupirPerubahanJadwal(params: {
 }): Promise<void> {
   const client = klienWajibAda();
 
-  const { data: anakData, error: errAnak } = await client.from('anak').select('jenis_layanan').eq('id', params.anakId).single();
+  const { data: anakData, error: errAnak } = await client
+    .from('anak')
+    .select('jenis_layanan, orang_tua_id')
+    .eq('id', params.anakId)
+    .single();
   if (errAnak) throw errAnak;
 
   const jenisSesi = params.jenisPerubahan === 'pergi' ? 'pagi' : 'sore';
   const catatan = `Perubahan jadwal disetujui: ${params.jenisPerubahan === 'pergi' ? 'berangkat' : 'pulang'} pukul ${params.waktuBaru}, alamat ${params.jenisPerubahan === 'pergi' ? 'penjemputan' : 'pengantaran'}: ${params.alamatBaru ?? '-'}.`;
+
+  // Baca supir_id LAMA (kalau baris ini sudah pernah ditugaskan sebelumnya)
+  // -- sama seperti buatPenugasan(), ini satu-satunya cara membedakan
+  // "penugasan pertama" dari "ganti supir" pada anak jadwal khusus ini.
+  const { data: barisLama } = await client
+    .from('perjalanan')
+    .select('supir_id')
+    .eq('anak_id', params.anakId)
+    .eq('tanggal_perjalanan', params.tanggal)
+    .eq('jenis_perjalanan', jenisSesi)
+    .maybeSingle();
+  const supirLamaId = barisLama?.supir_id ?? null;
 
   const { data: perjalanan, error } = await client
     .from('perjalanan')
@@ -1274,6 +1356,39 @@ export async function tugaskanSupirPerubahanJadwal(params: {
     });
   } catch (err) {
     console.error('Gagal kirim notifikasi penugasan perubahan jadwal:', err);
+  }
+
+  // Ganti supir (bukan penugasan pertama) -- beri tahu supir lama & orang tua.
+  if (supirLamaId && supirLamaId !== params.supirId) {
+    try {
+      await kirimNotifikasi({
+        penggunaId: supirLamaId,
+        judul: 'Penugasan Dialihkan',
+        pesan: `Tugas menjemput/mengantar ${params.namaAnak} (jadwal khusus) tanggal ${params.tanggal} telah dialihkan Admin ke supir lain.`,
+        tipe: 'perjalanan',
+        idTerkait: perjalanan.id,
+        tipeTerkait: 'penugasan_dialihkan'
+      });
+    } catch (err) {
+      console.error('Gagal kirim notifikasi ke supir lama soal pengalihan tugas:', err);
+    }
+
+    if (anakData.orang_tua_id) {
+      try {
+        const { data: supirBaruData } = await client.from('pengguna').select('nama_lengkap').eq('id', params.supirId).maybeSingle();
+        const namaSupirBaru = supirBaruData?.nama_lengkap ?? 'supir pengganti';
+        await kirimNotifikasi({
+          penggunaId: anakData.orang_tua_id,
+          judul: 'Supir Pengganti Ditugaskan',
+          pesan: `Supir untuk ${params.namaAnak} (jadwal khusus tanggal ${params.tanggal}) telah diganti menjadi ${namaSupirBaru}.`,
+          tipe: 'perjalanan',
+          idTerkait: perjalanan.id,
+          tipeTerkait: 'penugasan_dialihkan'
+        });
+      } catch (err) {
+        console.error('Gagal kirim notifikasi ke orang tua soal pergantian supir:', err);
+      }
+    }
   }
 }
 
