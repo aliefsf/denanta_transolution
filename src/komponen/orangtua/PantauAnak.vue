@@ -102,6 +102,19 @@ const daftarKelasEdit = computed(
   () => daftarSekolah.value.find((s) => s.id === anakEdit.value.sekolah_id)?.kelasTersedia ?? []
 );
 
+// Sekolah SENGAJA tidak bisa diubah dari modal ini -- biaya_bulanan dihitung
+// dari jarak ke sekolah saat pendaftaran (hitungBiayaBulanan, tarifLayanan.ts)
+// dan TIDAK pernah dihitung ulang otomatis kalau sekolah_id berubah setelah
+// itu. Membiarkan pengguna ganti sekolah sendiri lewat sini bisa membuat
+// tarif yang tersimpan tidak lagi mencerminkan jarak sekolah yang sebenarnya
+// (anak pindah lebih jauh tapi tetap bayar tarif lama yang lebih murah, atau
+// sebaliknya). Perubahan sekolah untuk sementara hanya lewat Admin, yang bisa
+// menyesuaikan tarif secara manual bersamaan. Nama sekolah tetap ditampilkan
+// (read-only) supaya orang tua bisa memastikan datanya benar.
+const namaSekolahEdit = computed(
+  () => daftarSekolah.value.find((s) => s.id === anakEdit.value.sekolah_id)?.nama ?? ''
+);
+
 const bukaModalEdit = async (anakId: string) => {
   const anakAsli = anakAktifList.value.find((a: AnakRow) => a.id === anakId);
   if (!anakAsli) return;
@@ -155,8 +168,8 @@ const tanganiLokasiEdit = (data: { lintang: number; bujur: number; alamat: strin
 };
 
 const simpanEditAnak = async () => {
-  if (!anakEdit.value.nama_lengkap || !anakEdit.value.sekolah_id || !anakEdit.value.kelas) {
-    picuToast('Nama, sekolah, dan kelas wajib diisi.', 'error');
+  if (!anakEdit.value.nama_lengkap || !anakEdit.value.kelas) {
+    picuToast('Nama dan kelas wajib diisi.', 'error');
     return;
   }
 
@@ -352,13 +365,12 @@ const simpanEditAnak = async () => {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">Sekolah</label>
-            <select
-              v-model="anakEdit.sekolah_id"
-              class="w-full h-10 px-3 rounded-xl border border-outline-variant bg-surface-bright text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"
-            >
-              <option value="" disabled>Pilih Sekolah</option>
-              <option v-for="sek in daftarSekolah" :key="sek.id" :value="sek.id">{{ sek.nama }}</option>
-            </select>
+            <div class="w-full h-10 px-3 rounded-xl border border-outline-variant/30 bg-surface-container text-on-surface-variant flex items-center">
+              {{ namaSekolahEdit || '-' }}
+            </div>
+            <p class="text-[10px] text-on-surface-variant mt-1">
+              Sekolah tidak dapat diubah sendiri (memengaruhi tarif). Hubungi Admin untuk memindahkan anak ke sekolah lain.
+            </p>
           </div>
 
           <div>
