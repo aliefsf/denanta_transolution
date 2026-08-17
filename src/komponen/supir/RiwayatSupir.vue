@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { Loader2, AlertTriangle, CheckCircle2, History } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, CheckCircle2, History, Trash2 } from 'lucide-vue-next';
 import {
   ambilRiwayatPerjalanan,
   ambilLaporanKendalaSupir,
   perbaruiStatusLaporanKendalaSupir,
+  hapusLaporanKendalaSupir,
   type RiwayatPerjalananSupir,
-  type LaporanKendalaSupir
+  type LaporanKendalaSupir,
+  type KategoriKendala
 } from '../../layanan/supirLayanan';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
+import ModalUtama from '../umum/ModalUtama.vue';
+import TombolUtama from '../umum/TombolUtama.vue';
 
 // Toast Alert
 const toastTampil = ref(false);
@@ -53,6 +57,29 @@ const sedangMemuatKendala = ref(true);
 const daftarKendala = ref<LaporanKendalaSupir[]>([]);
 const sedangMemperbaruiKendala = ref<string | null>(null);
 
+// Filter "Laporan Kendala Saya" -- kategori & tanggal laporan dibuat,
+// murni penyaringan sisi klien (daftar sumbernya tetap seluruh riwayat
+// laporan milik supir, sama seperti sebelumnya).
+const filterKategoriKendala = ref<KategoriKendala | 'semua'>('semua');
+const filterTanggalKendala = ref('');
+
+// Tanggal lokal (zona waktu browser, WIB) dari string ISO -- SENGAJA bukan
+// iso.slice(0, 10) (itu tanggal UTC), supaya filter tanggal konsisten
+// dengan tanggal yang ditampilkan di kolom "Waktu" (toLocaleString, juga
+// memakai zona waktu lokal).
+const tanggalLokalDariIso = (iso: string): string => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const daftarKendalaTerfilter = computed(() =>
+  daftarKendala.value.filter((l) => {
+    if (filterKategoriKendala.value !== 'semua' && l.kategori !== filterKategoriKendala.value) return false;
+    if (filterTanggalKendala.value && tanggalLokalDariIso(l.dibuatPada) !== filterTanggalKendala.value) return false;
+    return true;
+  })
+);
+
 const muatLaporanKendala = async () => {
   sedangMemuatKendala.value = true;
   try {
@@ -90,6 +117,53 @@ const ubahStatusKendala = async (laporan: LaporanKendalaSupir, status: 'ditindak
     picuToast(err.message || 'Gagal memperbarui status laporan kendala.', 'error');
   } finally {
     sedangMemperbaruiKendala.value = null;
+  }
+};
+
+// Hapus (satu baris / hapus semua) -- selalu lewat modal konfirmasi dulu,
+// tindakan ini permanen (tidak seperti ubah status, tidak bisa dibatalkan).
+const modalHapusKendalaTampil = ref(false);
+const kendalaAkanDihapus = ref<LaporanKendalaSupir | null>(null); // null = mode "Hapus Semua"
+const sedangMenghapusKendala = ref(false);
+
+const bukaKonfirmasiHapusSatu = (laporan: LaporanKendalaSupir) => {
+  kendalaAkanDihapus.value = laporan;
+  modalHapusKendalaTampil.value = true;
+};
+
+const bukaKonfirmasiHapusSemua = () => {
+  if (daftarKendalaTerfilter.value.length === 0) return;
+  kendalaAkanDihapus.value = null;
+  modalHapusKendalaTampil.value = true;
+};
+
+const konfirmasiHapusKendala = async () => {
+  sedangMenghapusKendala.value = true;
+  try {
+    if (kendalaAkanDihapus.value) {
+      // Hapus satu baris
+      await hapusLaporanKendalaSupir(kendalaAkanDihapus.value.id);
+      daftarKendala.value = daftarKendala.value.filter((l) => l.id !== kendalaAkanDihapus.value!.id);
+      picuToast('Laporan kendala berhasil dihapus.', 'sukses');
+    } else {
+      // Hapus Semua -- hanya yang sedang tampil sesuai filter aktif, bukan
+      // literal seluruh riwayat kalau filter sedang menyaring sebagian.
+      const idTerhapus = daftarKendalaTerfilter.value.map((l) => l.id);
+      const hasil = await Promise.allSettled(idTerhapus.map((id) => hapusLaporanKendalaSupir(id)));
+      const idSuksesTerhapus = new Set(idTerhapus.filter((_, i) => hasil[i].status === 'fulfilled'));
+      const jumlahGagal = hasil.filter((h) => h.status === 'rejected').length;
+      daftarKendala.value = daftarKendala.value.filter((l) => !idSuksesTerhapus.has(l.id));
+      if (jumlahGagal > 0) {
+        picuToast(`${idSuksesTerhapus.size} laporan berhasil dihapus, ${jumlahGagal} gagal dihapus.`, 'error');
+      } else {
+        picuToast(`${idSuksesTerhapus.size} laporan kendala berhasil dihapus.`, 'sukses');
+      }
+    }
+    modalHapusKendalaTampil.value = false;
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal menghapus laporan kendala.', 'error');
+  } finally {
+    sedangMenghapusKendala.value = false;
   }
 };
 
@@ -203,9 +277,42 @@ const labelStatus = (status: string) => status === 'dibatalkan' ? 'Dibatalkan' :
 
     <!-- Laporan Kendala Saya -- supir sendiri yang menandai status
          ditindak/selesai, Admin hanya melihat (read-only). -->
-    <div>
-      <h2 class="text-sm font-bold text-on-background uppercase tracking-wider">Laporan Kendala Saya</h2>
-      <p class="text-xs text-on-surface-variant">Tandai sendiri status penanganan kendala yang pernah Anda laporkan.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-bold text-on-background uppercase tracking-wider">Laporan Kendala Saya</h2>
+        <p class="text-xs text-on-surface-variant">Tandai sendiri status penanganan kendala yang pernah Anda laporkan.</p>
+      </div>
+      <button
+        v-if="daftarKendalaTerfilter.length > 0"
+        type="button"
+        @click="bukaKonfirmasiHapusSemua"
+        class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-200 text-rose-600 bg-surface-container-lowest hover:bg-rose-50 text-xs font-bold cursor-pointer transition-colors flex-shrink-0"
+      >
+        <Trash2 class="w-3.5 h-3.5" /> Hapus Semua
+      </button>
+    </div>
+
+    <!-- Filter Kategori & Tanggal -->
+    <div class="bg-surface-container-lowest border border-outline-variant/30 p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-4 soft-shadow text-xs">
+      <div>
+        <label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">Filter Kategori:</label>
+        <select
+          v-model="filterKategoriKendala"
+          class="w-full px-3 py-2 bg-surface-bright border border-outline-variant rounded-xl text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container"
+        >
+          <option value="semua">Semua Kategori</option>
+          <option value="kendala_anak">Kendala Anak</option>
+          <option value="kendala_perjalanan">Kendala Perjalanan</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wide mb-1.5">Filter Tanggal Laporan:</label>
+        <input
+          type="date"
+          v-model="filterTanggalKendala"
+          class="w-full px-3 py-2 bg-surface-bright border border-outline-variant rounded-xl text-on-surface focus:outline-none focus:ring-1 focus:ring-primary-container font-mono"
+        />
+      </div>
     </div>
 
     <div v-if="sedangMemuatKendala" class="flex items-center justify-center py-10">
@@ -225,7 +332,7 @@ const labelStatus = (status: string) => status === 'dibatalkan' ? 'Dibatalkan' :
             </tr>
           </thead>
           <tbody class="divide-y divide-outline-variant/20 text-on-surface-variant">
-            <tr v-for="laporan in daftarKendala" :key="laporan.id" class="hover:bg-surface-container/40 transition-colors">
+            <tr v-for="laporan in daftarKendalaTerfilter" :key="laporan.id" class="hover:bg-surface-container/40 transition-colors">
               <td class="py-4 px-4 font-mono text-[11px]">
                 {{ new Date(laporan.dibuatPada).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) }} WIB
               </td>
@@ -261,14 +368,58 @@ const labelStatus = (status: string) => status === 'dibatalkan' ? 'Dibatalkan' :
                   <CheckCircle2 class="w-3.5 h-3.5" /> Tandai Selesai
                 </button>
                 <span v-if="laporan.status === 'selesai'" class="text-on-surface-variant italic">Selesai</span>
+                <button
+                  type="button"
+                  title="Hapus Laporan"
+                  :disabled="sedangMemperbaruiKendala === laporan.id"
+                  @click="bukaKonfirmasiHapusSatu(laporan)"
+                  class="px-2 py-1.5 border border-rose-200 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded font-semibold transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </button>
               </td>
             </tr>
-            <tr v-if="daftarKendala.length === 0">
-              <td colspan="6" class="py-8 text-center text-on-surface-variant italic">Belum ada laporan kendala yang pernah Anda kirimkan.</td>
+            <tr v-if="daftarKendalaTerfilter.length === 0">
+              <td colspan="6" class="py-8 text-center text-on-surface-variant italic">
+                {{ daftarKendala.length === 0 ? 'Belum ada laporan kendala yang pernah Anda kirimkan.' : 'Tidak ada laporan kendala yang cocok dengan filter.' }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
+
+    <!-- Modal Konfirmasi Hapus Laporan Kendala -->
+    <ModalUtama
+      tema="terang"
+      :tampil="modalHapusKendalaTampil"
+      judul="Hapus Laporan Kendala"
+      @tutup="modalHapusKendalaTampil = false"
+    >
+      <p class="text-xs text-on-surface-variant leading-relaxed">
+        <template v-if="kendalaAkanDihapus">
+          Yakin ingin menghapus laporan kendala <strong>"{{ kendalaAkanDihapus.deskripsi }}"</strong> ini?
+        </template>
+        <template v-else>
+          Yakin ingin menghapus <strong>{{ daftarKendalaTerfilter.length }} laporan kendala</strong> yang sedang tampil (sesuai filter aktif) ini?
+        </template>
+        Tindakan ini <strong>tidak dapat dibatalkan</strong>. Notifikasi yang sudah terkirim ke Admin/orang tua tidak akan ikut terhapus.
+      </p>
+
+      <template #footer>
+        <TombolUtama tema="terang" varian="garis-luar" :nonaktif="sedangMenghapusKendala" @click="modalHapusKendalaTampil = false">
+          Batal
+        </TombolUtama>
+        <TombolUtama
+          tema="terang"
+          varian="utama"
+          class="bg-rose-600 hover:bg-rose-700"
+          :nonaktif="sedangMenghapusKendala"
+          @click="konfirmasiHapusKendala"
+        >
+          {{ sedangMenghapusKendala ? 'Menghapus...' : 'Ya, Hapus' }}
+        </TombolUtama>
+      </template>
+    </ModalUtama>
   </div>
 </template>

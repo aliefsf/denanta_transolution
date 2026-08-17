@@ -685,6 +685,27 @@ export async function perbaruiStatusLaporanKendalaSupir(
   }
 }
 
+/**
+ * Hapus laporan kendala MILIK SENDIRI dari daftar "Laporan Kendala Saya"
+ * (RiwayatSupir.vue) -- murni membersihkan tampilan riwayat supir, TIDAK
+ * mengirim notifikasi apa pun (beda dari perbaruiStatusLaporanKendalaSupir).
+ * `riwayat_laporan_kendala` ikut terhapus otomatis lewat ON DELETE CASCADE
+ * (skema_database.sql). RLS memastikan hanya baris supir_id = auth.uid()
+ * yang bisa dihapus -- lihat migrasi "SUPIR MENGHAPUS LAPORAN KENDALA
+ * MILIKNYA SENDIRI" di skema_database.sql.
+ */
+export async function hapusLaporanKendalaSupir(laporanId: string): Promise<void> {
+  const client = klienWajibAda();
+  // `.select('id')` WAJIB ada -- RLS yang menolak DELETE tidak melempar
+  // error, cuma diam-diam menghapus 0 baris (pola sama seperti catatan di
+  // perbaruiStatusPerjalanan, supirLayanan.ts).
+  const { data: barisTerhapus, error } = await client.from('laporan_kendala').delete().eq('id', laporanId).select('id');
+  if (error) throw error;
+  if (!barisTerhapus || barisTerhapus.length === 0) {
+    throw new Error('Gagal menghapus laporan -- laporan ini mungkin bukan milik akun Anda.');
+  }
+}
+
 // ==========================================
 // UC-S05: Lihat Riwayat Perjalanan
 // ==========================================

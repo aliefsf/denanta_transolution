@@ -2753,3 +2753,23 @@ CREATE POLICY "Laporan Kendala: Orang tua melihat laporan kendala terkait anakny
       ))
     )
   );
+
+-- ==========================================
+-- MIGRASI: SUPIR MENGHAPUS LAPORAN KENDALA MILIKNYA SENDIRI
+-- Halaman "Laporan Kendala Saya" (RiwayatSupir.vue) sekarang punya tombol
+-- "Hapus" per baris + "Hapus Semua" (bulk, menghapus seluruh laporan yang
+-- sedang tampil sesuai filter aktif) -- sebelumnya tidak ada kebijakan
+-- DELETE sama sekali untuk laporan_kendala, jadi permintaan DELETE dari
+-- supir akan gagal senyap (RLS default-deny, 0 baris terhapus, tanpa
+-- error) kalau tidak dijalankan lewat migrasi ini. Baris riwayat_laporan_
+-- kendala terkait ikut terhapus otomatis lewat ON DELETE CASCADE (lihat
+-- definisi tabelnya di atas) -- tidak perlu DELETE terpisah untuk itu.
+-- Sengaja TIDAK dibatasi hanya status 'selesai' -- supir yang paling tahu
+-- laporan mana yang salah kirim/tidak relevan lagi, dan Admin tetap
+-- melihat notifikasi asli yang sudah terkirim terlepas dari baris sumber
+-- laporan_kendala ini dihapus atau tidak.
+-- ==========================================
+DROP POLICY IF EXISTS "Laporan Kendala: Supir menghapus laporan miliknya sendiri" ON laporan_kendala;
+CREATE POLICY "Laporan Kendala: Supir menghapus laporan miliknya sendiri"
+  ON laporan_kendala FOR DELETE TO authenticated
+  USING (supir_id = auth.uid());
