@@ -136,14 +136,27 @@ const daftarTugas = ref<TugasAnakSupir[]>([]);
 // SELURUH riwayat laporan milik supir (ambilLaporanKendalaSupir mengambil
 // semua tanggal) ke tanggal hari ini saja, karena kendala kemarin yang belum
 // ditutup bukan tanggung jawab tugas hari ini.
-const daftarKendalaAktif = ref<LaporanKendalaSupir[]>([]);
+//
+// Disimpan MENTAH (lintas sesi) di sini -- lihat daftarKendalaAktif di bawah
+// utk versi yang SUDAH difilter sesuai sesiTerpilih. Sebelumnya kartu ini
+// langsung memakai hasil mentah ini apa adanya, jadi kendala sesi Sore tetap
+// tampil walau supir sedang membuka tab Sesi Pagi -- membingungkan &
+// bertentangan dgn perbaikan pemisahan sesi yang sama di tempat lain.
+const semuaKendalaAktifHariIni = ref<LaporanKendalaSupir[]>([]);
 const sedangMemperbaruiKendala = ref<string | null>(null);
+
+// Kartu "Kendala Aktif" HARUS mengikuti sesi yang sedang dipilih di dropdown
+// "Pilih Sesi Perjalanan" -- kendala sesi Pagi hanya tampil saat tab Pagi
+// aktif, begitu juga Sore, supaya tidak lagi terasa "tercampur".
+const daftarKendalaAktif = computed(() =>
+  semuaKendalaAktifHariIni.value.filter((l) => l.jenisPerjalanan === sesiTerpilih.value)
+);
 
 const muatKendalaAktif = async () => {
   try {
     const hariIni = ambilTanggalWibSekarang();
     const semua = await ambilLaporanKendalaSupir();
-    daftarKendalaAktif.value = semua.filter((l) => l.tanggalPerjalanan === hariIni && l.status !== 'selesai');
+    semuaKendalaAktifHariIni.value = semua.filter((l) => l.tanggalPerjalanan === hariIni && l.status !== 'selesai');
   } catch (err) {
     console.error('Gagal memuat laporan kendala aktif:', err);
   }
@@ -342,9 +355,7 @@ const semuaTitikSampaiTujuan = computed(() =>
 // perjalanan (semuaTitikSampaiTujuan), kendala SELESAI berdasarkan tindak
 // lanjut laporan (perbaruiStatusLaporanKendalaSupir) -- keduanya tidak
 // saling mengunci satu sama lain.
-const kendalaBelumSelesaiSesiIni = computed(() =>
-  daftarKendalaAktif.value.some((l) => l.jenisPerjalanan === sesiTerpilih.value)
-);
+const kendalaBelumSelesaiSesiIni = computed(() => daftarKendalaAktif.value.length > 0);
 const kendalaAktifSectionEl = ref<HTMLElement | null>(null);
 const gulirKeKendalaAktif = () => {
   kendalaAktifSectionEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
