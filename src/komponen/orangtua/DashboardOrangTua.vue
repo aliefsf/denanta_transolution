@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue';
-import { useAuthStore } from '../../penyimpanan/authStore';
 import { formatWaktuRelatif } from '../../bantuan/formatWaktuRelatif';
 import { petakanAnakTampilan } from '../../bantuan/petakanAnak';
 import { infoTampilanNotifikasi } from '../../bantuan/notifikasiTampilan';
@@ -17,9 +16,7 @@ import TombolUtama from '../umum/TombolUtama.vue';
 import MemuatUtama from '../umum/MemuatUtama.vue';
 import BadgeStatusAnak from './BadgeStatusAnak.vue';
 
-const authStore = useAuthStore();
 const {
-  profil,
   anakAktifList,
   anakMenungguPembayaranList,
   perjalananHariIniList,
@@ -39,10 +36,6 @@ const emit = defineEmits<{
 onMounted(() => {
   if (!sudahDimuat.value) muatSemua();
 });
-
-const namaPengguna = computed(
-  () => profil.value?.pengguna.nama_lengkap || authStore.pengguna?.email?.split('@')[0] || 'Orang Tua'
-);
 
 // Menu/tab "Jadwal" (dan pintasan "Absen Harian" di sini) hanya berlaku
 // utk langganan BULANAN -- lihat catatan yang sama di TataLetakOrangTua.vue.
@@ -167,15 +160,17 @@ const jumlahKendalaAktif = computed(() => daftarAnak.value.filter((a) => a.statu
   <div class="space-y-6 relative min-h-[240px]">
     <MemuatUtama tema="terang" :tampil="sedangMemuat" pesan="Memuat data dashboard..." />
 
-    <!-- Welcome Greeting Header -->
+    <!-- Ringkasan Hari Ini -- SENGAJA tidak mengulang sapaan "Halo, {nama}"
+         lagi di sini, sudah ditampilkan di navbar atas (TataLetakOrangTua.vue) --
+         sebelumnya kartu ini menduplikasi teks yang sama persis. -->
     <div class="relative overflow-hidden bg-gradient-to-br from-primary-container/40 via-surface-container-lowest to-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 soft-shadow">
       <div class="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-primary/5"></div>
       <div class="absolute -right-4 bottom-0 w-24 h-24 rounded-full bg-primary/5"></div>
       <div class="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <p class="text-[10px] font-bold uppercase tracking-widest text-primary">Portal Orang Tua</p>
-          <h1 class="text-2xl font-extrabold text-on-background tracking-tight mt-0.5">Halo, {{ namaPengguna }}!</h1>
-          <p class="text-xs text-on-surface-variant mt-1">Selamat datang kembali di panel monitoring Denanta TranSolution.</p>
+          <p class="text-[10px] font-bold uppercase tracking-widest text-primary">Ringkasan Hari Ini</p>
+          <h1 class="text-2xl font-extrabold text-on-background tracking-tight mt-0.5">Panel Monitoring Anak Anda</h1>
+          <p class="text-xs text-on-surface-variant mt-1">Pantau status perjalanan, langganan, dan pemberitahuan terbaru dalam satu tempat.</p>
         </div>
         <div
           v-if="sisaLanggananTerdekat !== null && sisaLanggananTerdekat.sisaHari <= 5"
