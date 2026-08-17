@@ -2707,3 +2707,49 @@ ALTER TABLE supir ADD COLUMN IF NOT EXISTS sedang_bertugas_diaktifkan_pada times
 -- Lihat hentikanLangganan() di src/layanan/berlangganganLayanan.ts.
 -- ==========================================
 ALTER TABLE langganan ADD COLUMN IF NOT EXISTS dibatalkan_pada timestamptz;
+
+-- ==========================================
+-- MIGRASI: PERBAIKI VISIBILITAS "KENDALA PERJALANAN" LINTAS ANAK SATU RUTE
+-- (Bug Fix: fitur "Lapor Kendala" satu tombol, RiwayatSupir/Pantau Anak).
+-- laporan_kendala HANYA menyimpan SATU baris per laporan, terikat ke SATU
+-- perjalanan_id acuan (anak mana pun yang kebetulan dipakai sistem sebagai
+-- acuan saat supir mengirim laporan "Kendala Perjalanan") -- lihat
+-- laporkan_kendala_perjalanan() di atas, yang MEMANG SUDAH BENAR mengirim
+-- notifikasi ke SELURUH orang tua anak di rute yang sama (supir_id +
+-- tanggal_perjalanan), bukan cuma anak acuan itu.
+--
+-- Masalahnya: kebijakan RLS SELECT di bawah ini sebelumnya hanya
+-- memperbolehkan orang tua membaca laporan_kendala kalau perjalanan_id
+-- laporan itu PERSIS milik anak mereka sendiri -- jadi walau notifikasi
+-- sudah benar terkirim ke semua orang tua di rute itu, halaman "Pantau
+-- Anak"/"Detail Anak" milik orang tua LAIN (anak yang BUKAN kebetulan jadi
+-- acuan laporan) tidak pernah bisa menampilkan banner kendala itu sama
+-- sekali -- RLS menolaknya walau query sisi klien sudah diperbaiki.
+--
+-- Kebijakan baru ini memperluas cakupan KHUSUS utk kategori
+-- 'kendala_perjalanan': orang tua boleh membaca laporan itu kalau salah
+-- satu anaknya punya baris `perjalanan` dengan supir_id & tanggal_perjalanan
+-- YANG SAMA dengan perjalanan acuan laporan tsb -- bukan lagi harus persis
+-- baris perjalanan yang sama. Kategori 'kendala_anak' TIDAK berubah (tetap
+-- ketat, hanya orang tua anak yang dipilih spesifik).
+-- ==========================================
+DROP POLICY IF EXISTS "Laporan Kendala: Orang tua melihat laporan kendala terkait anaknya" ON laporan_kendala;
+CREATE POLICY "Laporan Kendala: Orang tua melihat laporan kendala terkait anaknya"
+  ON laporan_kendala FOR SELECT TO authenticated
+  USING (
+    dapatkan_peran_pengguna(auth.uid()) = 'orangtua' AND (
+      (kategori = 'kendala_anak' AND EXISTS (
+        SELECT 1 FROM anak WHERE anak.id = laporan_kendala.anak_id AND anak.orang_tua_id = auth.uid()
+      ))
+      OR
+      (kategori = 'kendala_perjalanan' AND EXISTS (
+        SELECT 1 FROM perjalanan AS p_acuan
+        JOIN perjalanan AS p_anak
+          ON p_anak.supir_id = p_acuan.supir_id
+         AND p_anak.tanggal_perjalanan = p_acuan.tanggal_perjalanan
+        JOIN anak ON anak.id = p_anak.anak_id
+        WHERE p_acuan.id = laporan_kendala.perjalanan_id
+          AND anak.orang_tua_id = auth.uid()
+      ))
+    )
+  );

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { Navigation, AlertTriangle, ExternalLink, User } from 'lucide-vue-next';
+import { Navigation, ExternalLink, User } from 'lucide-vue-next';
 import TombolUtama from '../umum/TombolUtama.vue';
 import type { TugasAnakSupir } from '../../layanan/supirLayanan';
 import { mapStatusPerjalananKeUI } from '../../bantuan/statusPerjalanan';
@@ -11,10 +11,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-
-const emit = defineEmits<{
-  (e: 'buka-kendala', anak: TugasAnakSupir): void;
-}>();
 
 const infoBadge = computed(() => {
   const statusUI = mapStatusPerjalananKeUI(props.anak.status, props.anak.jenisPerjalanan);
@@ -88,9 +84,11 @@ const koordinatTujuan = computed(() =>
       </div>
     </div>
 
-    <!-- Actions Footer Bar -->
-    <div class="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-outline-variant/20">
-      <!-- Google Maps External Link -->
+    <!-- Actions Footer Bar -- tombol "Kendala" per-anak SENGAJA dihapus dari
+         sini (digantikan SATU tombol "Lapor Kendala" di atas daftar,
+         TugasSupir.vue) supaya supir tidak perlu lapor berulang per anak
+         untuk kendala yang berdampak ke seluruh rute. -->
+    <div class="pt-3 border-t border-outline-variant/20">
       <a
         :href="`https://www.google.com/maps/search/?api=1&query=${koordinatTujuan.lat},${koordinatTujuan.lng}`"
         target="_blank"
@@ -101,15 +99,6 @@ const koordinatTujuan = computed(() =>
           <ExternalLink class="w-3 h-3 text-on-surface-variant" />
         </TombolUtama>
       </a>
-
-      <!-- Report Obstacle Button -->
-      <button
-        @click="emit('buka-kendala', anak)"
-        class="flex items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold border border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer transition-colors"
-      >
-        <AlertTriangle class="w-3.5 h-3.5" />
-        Kendala
-      </button>
     </div>
     <p class="text-[9px] text-on-surface-variant text-center -mt-1">Ubah status perjalanan lewat "Detail Rute Terhitung" di atas.</p>
   </div>

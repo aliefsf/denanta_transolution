@@ -356,7 +356,42 @@ export async function ambilPerjalananHariIniByAnakIds(anakIds: string[]): Promis
     .eq('tanggal_perjalanan', hariIni)
     .neq('status', 'dibatalkan');
   if (error) throw error;
-  return lengkapiNamaSupir((data as PerjalananRow[]) ?? []);
+  const perjalananList = (data as (PerjalananRow & { laporan_kendala?: any[] })[]) ?? [];
+
+  // Laporan "Kendala Perjalanan" (rute) HANYA tersimpan SATU baris per
+  // laporan, terikat ke SATU perjalanan_id acuan (anak mana pun yang
+  // kebetulan dipakai sistem sebagai acuan saat supir mengirim lewat tombol
+  // "Lapor Kendala" -- lihat laporkan_kendala_perjalanan() di
+  // skema_database.sql). Join `laporan_kendala(*)` di atas SAJA cuma
+  // menangkap laporan itu untuk anak acuan tsb -- anak LAIN yang naik supir
+  // sama pada tanggal yang sama tidak akan pernah melihatnya di halaman
+  // Pantau Anak/Detail Anak mereka sendiri, padahal notifikasinya sudah
+  // benar terkirim ke orang tua mereka juga. Query tambahan ini mengambil
+  // SEMUA laporan kendala_perjalanan yang supir_id-nya cocok dengan supir
+  // anak-anak akun ini pada tanggal yang sama, lalu ditempelkan ke SETIAP
+  // baris perjalanan yang relevan (bukan cuma anak acuannya).
+  const supirIdsUnik = Array.from(new Set(perjalananList.map((p) => p.supir_id).filter((id): id is string => !!id)));
+  if (supirIdsUnik.length > 0) {
+    const { data: kendalaRute, error: errKendala } = await client
+      .from('laporan_kendala')
+      .select('*, perjalanan!inner(supir_id, tanggal_perjalanan)')
+      .eq('kategori', 'kendala_perjalanan')
+      .in('perjalanan.supir_id', supirIdsUnik)
+      .eq('perjalanan.tanggal_perjalanan', hariIni);
+    if (!errKendala && kendalaRute) {
+      for (const p of perjalananList) {
+        const idSudahAda = new Set((p.laporan_kendala ?? []).map((k: any) => k.id));
+        const tambahan = (kendalaRute as any[]).filter(
+          (k) => k.perjalanan?.supir_id === p.supir_id && !idSudahAda.has(k.id)
+        );
+        if (tambahan.length > 0) {
+          p.laporan_kendala = [...(p.laporan_kendala ?? []), ...tambahan];
+        }
+      }
+    }
+  }
+
+  return lengkapiNamaSupir(perjalananList);
 }
 
 export async function ambilRiwayatPerjalanan(anakIds: string[]): Promise<PerjalananDenganSupir[]> {

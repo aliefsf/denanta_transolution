@@ -350,8 +350,19 @@ const sedangMemproses = ref(false);
 const sedangMengubahStatus = ref<string | null>(null);
 const anakAktif = ref<TugasAnakSupir | null>(null);
 
-const bukaKendalaModal = (anak: TugasAnakSupir) => {
-  anakAktif.value = anak;
+// Satu tombol "Lapor Kendala" global (bukan lagi per kartu anak) --
+// perlu SATU anak "acuan" sekadar untuk mendapatkan perjalanan_id yang
+// valid (dipakai laporkan_kendala_perjalanan() di server untuk menemukan
+// supir_id + tanggal_perjalanan rute ini); acuan mana pun yang dipilih
+// TIDAK memengaruhi siapa yang menerima laporan -- untuk kategori
+// "Kendala Perjalanan", server tetap menyiarkan ke SELURUH orang tua di
+// rute yang sama, bukan cuma anak acuan ini (lihat catatan lengkap di
+// migrasi laporkan_kendala_perjalanan(), skema_database.sql). Diutamakan
+// anak pada sesi yang sedang difilter; kalau kosong, jatuh ke anak
+// manapun yang ditugaskan hari ini (lintas sesi).
+const bukaKendalaModal = () => {
+  anakAktif.value = tugasTerurut.value[0] ?? daftarAnakUnik.value[0] ?? null;
+  if (!anakAktif.value) return;
   modalKendalaTampil.value = true;
 };
 
@@ -430,6 +441,19 @@ const konfirmasiSelesaikanRute = async () => {
         <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Tugas Hari Ini</h1>
         <p class="text-xs text-on-surface-variant">Ikuti urutan rute optimal untuk efisiensi waktu penjemputan siswa.</p>
       </div>
+      <!-- Satu tombol laporan kendala untuk seluruh rute -- lihat catatan
+           lengkap di bukaKendalaModal(). Menggantikan tombol "Kendala" yang
+           sebelumnya ada di tiap kartu anak. -->
+      <TombolUtama
+        v-if="daftarAnakUnik.length > 0"
+        tema="terang"
+        varian="garis-luar"
+        class="!border-rose-200 !text-rose-600 hover:!bg-rose-50 gap-1.5 flex-shrink-0"
+        @click="bukaKendalaModal"
+      >
+        <AlertTriangle class="w-4 h-4" />
+        Lapor Kendala
+      </TombolUtama>
     </div>
 
     <!-- Filter Bar -->
@@ -687,7 +711,6 @@ const konfirmasiSelesaikanRute = async () => {
             :key="anak.perjalananId"
             :anak="anak"
             :urutan="idx + 1"
-            @buka-kendala="bukaKendalaModal"
           />
         </div>
       </div>
