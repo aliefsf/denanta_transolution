@@ -1146,7 +1146,7 @@ const LABEL_ALASAN_CUTI: Record<string, string> = {
               <CalendarDays class="w-4 h-4 text-primary" />
               Konfigurasi Jadwal Mingguan
             </h3>
-            <p class="text-xs text-on-surface-variant">Centang hari aktif sekolah anak -- sistem otomatis menandai tanggal yang sesuai pada kalender bulan berjalan. Perubahan baru berlaku setelah tombol <strong>Simpan Perubahan Jadwal</strong> ditekan.</p>
+            <p class="text-xs text-on-surface-variant">Centang hari aktif sekolah anak, sistem otomatis menandai tanggal yang sesuai pada kalender bulan berjalan. Perubahan baru berlaku setelah tombol <strong>Simpan Perubahan Jadwal</strong> ditekan.</p>
 
             <!-- Kuota perubahan jadwal minggu ini -->
             <div
