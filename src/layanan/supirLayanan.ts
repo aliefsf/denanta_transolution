@@ -575,7 +575,7 @@ export async function perbaruiStatusLaporanKendalaSupir(
 
   const { data: laporan } = await client
     .from('laporan_kendala')
-    .select('kategori, anak_id')
+    .select('kategori, anak_id, perjalanan_id')
     .eq('id', laporanId)
     .maybeSingle();
 
@@ -635,6 +635,52 @@ export async function perbaruiStatusLaporanKendalaSupir(
       }
     } catch (err) {
       console.error('Gagal kirim notifikasi status laporan kendala ke orang tua:', err);
+    }
+  }
+
+  // Kendala kategori kendala_perjalanan berdampak ke SEMUA anak dalam rute
+  // supir pada tanggal yang sama (bukan cuma satu anak acuan) -- samakan
+  // cakupan penerima dengan notifikasi saat laporan DIBUAT (lihat
+  // laporkan_kendala_perjalanan di skema_database.sql) dan visibilitas RLS
+  // "Orang tua melihat laporan kendala terkait anaknya". Best-effort.
+  if (laporan?.kategori === 'kendala_perjalanan' && laporan.perjalanan_id) {
+    try {
+      const { data: perjalananAcuan } = await client
+        .from('perjalanan')
+        .select('supir_id, tanggal_perjalanan')
+        .eq('id', laporan.perjalanan_id)
+        .maybeSingle();
+      if (perjalananAcuan?.supir_id) {
+        const { data: perjalananRute } = await client
+          .from('perjalanan')
+          .select('anak(orang_tua_id)')
+          .eq('supir_id', perjalananAcuan.supir_id)
+          .eq('tanggal_perjalanan', perjalananAcuan.tanggal_perjalanan);
+        const orangTuaIdUnik = Array.from(
+          new Set(
+            ((perjalananRute ?? []) as any[])
+              .map((p) => p.anak?.orang_tua_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+        await Promise.all(
+          orangTuaIdUnik.map((penggunaId) =>
+            kirimNotifikasi({
+              penggunaId,
+              judul: status === 'ditindak' ? 'Laporan Kendala Sedang Ditindak' : 'Laporan Kendala Selesai',
+              pesan:
+                status === 'ditindak'
+                  ? 'Kendala perjalanan pada rute anak Anda sedang ditindaklanjuti supir.'
+                  : 'Kendala perjalanan pada rute anak Anda sudah diselesaikan supir.',
+              tipe: 'sistem',
+              idTerkait: laporanId,
+              tipeTerkait: status === 'ditindak' ? 'kendala_ditindak' : 'kendala_selesai'
+            })
+          )
+        );
+      }
+    } catch (err) {
+      console.error('Gagal kirim notifikasi status laporan kendala perjalanan ke orang tua:', err);
     }
   }
 }

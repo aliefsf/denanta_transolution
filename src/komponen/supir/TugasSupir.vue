@@ -14,8 +14,11 @@ import {
   laporkanKendala,
   selesaikanRuteHariIni,
   perbaruiStatusBertugas,
+  ambilLaporanKendalaSupir,
+  perbaruiStatusLaporanKendalaSupir,
   type TugasAnakSupir,
-  type KategoriKendala
+  type KategoriKendala,
+  type LaporanKendalaSupir
 } from '../../layanan/supirLayanan';
 import type { StatusPerjalanan } from '../../tipe';
 import { hitungJarakKm } from '../../bantuan/jarak';
@@ -127,12 +130,32 @@ const mulaiBertugas = () => {
 const sedangMemuat = ref(true);
 const daftarTugas = ref<TugasAnakSupir[]>([]);
 
+// Laporan kendala HARI INI yang belum 'selesai' -- ditampilkan sebagai kartu
+// khusus di halaman ini (bukan cuma di Riwayat Perjalanan) supaya supir
+// langsung lihat & bisa menandai teratasi tanpa pindah halaman. Difilter dari
+// SELURUH riwayat laporan milik supir (ambilLaporanKendalaSupir mengambil
+// semua tanggal) ke tanggal hari ini saja, karena kendala kemarin yang belum
+// ditutup bukan tanggung jawab tugas hari ini.
+const daftarKendalaAktif = ref<LaporanKendalaSupir[]>([]);
+const sedangMemperbaruiKendala = ref<string | null>(null);
+
+const muatKendalaAktif = async () => {
+  try {
+    const hariIni = ambilTanggalWibSekarang();
+    const semua = await ambilLaporanKendalaSupir();
+    daftarKendalaAktif.value = semua.filter((l) => l.tanggalPerjalanan === hariIni && l.status !== 'selesai');
+  } catch (err) {
+    console.error('Gagal memuat laporan kendala aktif:', err);
+  }
+};
+
 const muatTugasHariIni = async () => {
   sedangMemuat.value = true;
   try {
     const hariIni = ambilTanggalWibSekarang();
     daftarTugas.value = await denganBatasWaktu(ambilTugasHariIni(hariIni), 20000, 'Waktu memuat daftar tugas habis.');
     sinkronkanGerbangSesi();
+    await muatKendalaAktif();
   } catch (err: any) {
     picuToast(err.message || 'Gagal memuat daftar tugas.', 'error');
   } finally {
@@ -388,10 +411,29 @@ const laporkanKendalaBaru = async (data: { perjalananId: string; kategori: Kateg
     await laporkanKendala(data.perjalananId, data.kategori, data.catatan, data.anakId);
     picuToast('Laporan kendala berhasil dikirim ke admin & orang tua terkait!', 'sukses');
     modalKendalaTampil.value = false;
+    await muatKendalaAktif();
   } catch (err: any) {
     picuToast(err.message || 'Gagal mengirim laporan kendala.', 'error');
   } finally {
     sedangMemproses.value = false;
+  }
+};
+
+// Handler tombol "Tandai Kendala Teratasi" pada kartu Kendala Aktif --
+// langsung set status 'selesai' (tanpa tahap antara 'ditindak') karena
+// permintaan fitur ini cuma minta satu tombol "sudah teratasi", bukan alur
+// dua tahap seperti di RiwayatSupir.vue. Notifikasi ke admin & orang tua
+// terkait dikirim otomatis di dalam perbaruiStatusLaporanKendalaSupir().
+const tandaiKendalaTeratasi = async (laporan: LaporanKendalaSupir) => {
+  sedangMemperbaruiKendala.value = laporan.id;
+  try {
+    await perbaruiStatusLaporanKendalaSupir(laporan.id, 'selesai', laporan.status);
+    picuToast('Kendala ditandai teratasi & notifikasi terkirim ke admin & orang tua!', 'sukses');
+    await muatKendalaAktif();
+  } catch (err: any) {
+    picuToast(err.message || 'Gagal menandai kendala teratasi.', 'error');
+  } finally {
+    sedangMemperbaruiKendala.value = null;
   }
 };
 
@@ -464,6 +506,47 @@ const konfirmasiSelesaikanRute = async () => {
           <option v-if="daftarSekolahSesi.length === 0" value="">Tidak ada tugas sesi ini</option>
           <option v-for="sch in daftarSekolahSesi" :key="sch" :value="sch">{{ sch }}</option>
         </select>
+      </div>
+    </div>
+
+    <!-- Kartu Kendala Aktif -- muncul begitu ada laporan kendala hari ini
+         yang belum ditandai selesai (lihat muatKendalaAktif() di script).
+         Sengaja ditaruh menonjol di sini (bukan cuma di Riwayat Perjalanan)
+         supaya supir tidak lupa menutup kendalanya begitu sudah beres. -->
+    <div v-if="daftarKendalaAktif.length > 0" class="bg-rose-50 border border-rose-200 rounded-2xl p-5 space-y-3">
+      <h3 class="text-sm font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
+        <AlertTriangle class="w-4 h-4" />
+        Kendala Aktif -- {{ daftarKendalaAktif.length }} Laporan Belum Teratasi
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div
+          v-for="laporan in daftarKendalaAktif"
+          :key="laporan.id"
+          class="bg-white border border-rose-200 rounded-xl p-4 space-y-2 text-xs"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-on-surface">
+              {{ laporan.kategori === 'kendala_anak' ? `Kendala Anak: ${laporan.namaAnak}` : 'Kendala Perjalanan (Seluruh Rute)' }}
+            </span>
+            <span
+              class="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full"
+              :class="laporan.status === 'ditindak' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'"
+            >
+              {{ laporan.status === 'ditindak' ? 'Sedang Ditindak' : 'Baru Dilaporkan' }}
+            </span>
+          </div>
+          <p class="text-on-surface-variant leading-relaxed">{{ laporan.deskripsi }}</p>
+          <TombolUtama
+            tema="terang"
+            varian="utama"
+            class="w-full gap-1.5 justify-center bg-emerald-600 hover:bg-emerald-700 !py-1.5 text-[11px]"
+            :nonaktif="sedangMemperbaruiKendala === laporan.id"
+            @click="tandaiKendalaTeratasi(laporan)"
+          >
+            <CheckCircle2 class="w-3.5 h-3.5" />
+            {{ sedangMemperbaruiKendala === laporan.id ? 'Menyimpan...' : 'Tandai Kendala Teratasi' }}
+          </TombolUtama>
+        </div>
       </div>
     </div>
 
