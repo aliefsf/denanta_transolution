@@ -179,6 +179,15 @@ function formatSesi(perjalananId: string): string {
   return 'Perjalanan';
 }
 
+// Nama supir yang menangani perjalanan rujukan laporan kendala ini --
+// perjalananPagiHariIni/perjalananSoreHariIni sudah lengkap dengan namaSupir
+// lewat lengkapiNamaSupir() (orangTuaLayanan.ts), jadi tinggal dicocokkan ID-nya.
+function namaSupirPelapor(perjalananId: string): string | null {
+  if (perjalananPagiHariIni.value?.id === perjalananId) return perjalananPagiHariIni.value.namaSupir ?? null;
+  if (perjalananSoreHariIni.value?.id === perjalananId) return perjalananSoreHariIni.value.namaSupir ?? null;
+  return null;
+}
+
 function formatStatusSaatKejadian(status: string | null | undefined): string {
   if (!status) return 'Dijadwalkan';
   const map: Record<string, string> = {
@@ -246,8 +255,8 @@ function formatStatusSaatKejadian(status: string | null | undefined): string {
                       kendala.status === 'selesai'
                         ? 'Selesai'
                         : kendala.status === 'ditindak'
-                        ? 'Ditindaklanjuti'
-                        : 'Baru'
+                        ? 'Diproses'
+                        : 'Belum Ditangani'
                     }}
                   </span>
                 </div>
@@ -267,6 +276,10 @@ function formatStatusSaatKejadian(status: string | null | undefined): string {
               <span class="hidden md:inline text-outline-variant">•</span>
               <span>
                 <strong>Status saat kejadian:</strong> {{ formatStatusSaatKejadian(kendala.status_perjalanan) }}
+              </span>
+              <span v-if="namaSupirPelapor(kendala.perjalanan_id)" class="hidden md:inline text-outline-variant">•</span>
+              <span v-if="namaSupirPelapor(kendala.perjalanan_id)">
+                <strong>Supir Pelapor:</strong> {{ namaSupirPelapor(kendala.perjalanan_id) }}
               </span>
             </div>
           </div>

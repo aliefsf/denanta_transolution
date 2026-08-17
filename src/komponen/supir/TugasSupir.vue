@@ -236,18 +236,21 @@ const tugasPerubahanJadwalSesi = computed(() => {
 
 const sekolahAktif = computed(() => tugasTerfilter.value[0] ?? null);
 
-// Daftar anak unik hari ini (dedupe by anakId) -- dipakai dropdown "Pilih
-// Nama Anak" pada ModalLaporanKendala, lintas sesi/sekolah (bukan hanya
-// yang sedang difilter), supaya supir bisa melaporkan kendala utk anak
-// manapun yang ditugaskan padanya hari ini.
-const daftarAnakUnik = computed(() => {
-  const terlihat = new Set<string>();
-  return daftarTugas.value.filter((a) => {
-    if (terlihat.has(a.anakId)) return false;
-    terlihat.add(a.anakId);
-    return true;
-  });
-});
+// Daftar anak pada SESI YANG SEDANG AKTIF saja (lintas sekolah, tapi TIDAK
+// lintas sesi) -- dipakai dropdown "Pilih Nama Anak" pada ModalLaporanKendala
+// & sebagai acuan perjalanan_id saat lapor kendala.
+//
+// SEBELUMNYA daftar ini dedupe LINTAS SESI (anak yang punya perjalanan pagi
+// & sore hari ini cuma diwakili SATU entri, entah entri pagi atau sore yang
+// "menang" tergantung urutan hasil query DB) -- akibatnya kalau supir sedang
+// membuka tab Sesi Pagi tapi anak yang dipilih di dropdown "Pilih Nama Anak"
+// kebetulan diwakili entri SORE-nya, perjalanan_id yang terkirim ke server
+// adalah milik SORE, padahal supir mengira sedang melapor untuk Pagi --
+// laporan kendala jadi salah terikat & muncul di halaman Orang Tua dengan
+// label sesi yang salah. Setiap anak_id+jenis_perjalanan cuma py SATU baris
+// per hari (UNIQUE constraint di skema_database.sql), jadi memfilter ke sesi
+// aktif di sini sudah otomatis bebas duplikat tanpa perlu dedupe tambahan.
+const daftarAnakSesiIni = computed(() => daftarTugas.value.filter((a) => a.jenisPerjalanan === sesiTerpilih.value));
 
 const koordinatAnak = (anak: TugasAnakSupir): [number, number] =>
   anak.jenisPerjalanan === 'pagi' ? [anak.lintangJemput, anak.bujurJemput] : [anak.lintangAntar, anak.bujurAntar];
@@ -331,6 +334,21 @@ const ruteSudahSelesaiDitandai = computed(() =>
 const semuaTitikSampaiTujuan = computed(() =>
   tugasTerfilter.value.length > 0 && tugasTerfilter.value.every(t => t.status === 'tiba')
 );
+
+// Kendala aktif (belum 'selesai') milik SESI YANG SEDANG DITAMPILKAN --
+// dipakai untuk peringatan (BUKAN penghalang) di sebelah tombol "Tandai
+// Tugas Hari Ini Telah Selesai". Penyelesaian tugas & penyelesaian kendala
+// sengaja dua proses terpisah: perjalanan anak SELESAI berdasarkan status
+// perjalanan (semuaTitikSampaiTujuan), kendala SELESAI berdasarkan tindak
+// lanjut laporan (perbaruiStatusLaporanKendalaSupir) -- keduanya tidak
+// saling mengunci satu sama lain.
+const kendalaBelumSelesaiSesiIni = computed(() =>
+  daftarKendalaAktif.value.some((l) => l.jenisPerjalanan === sesiTerpilih.value)
+);
+const kendalaAktifSectionEl = ref<HTMLElement | null>(null);
+const gulirKeKendalaAktif = () => {
+  kendalaAktifSectionEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 const waktuRuteSelesai = computed(() => {
   const waktu = tugasTerfilter.value.find(t => t.diselesaikanPada)?.diselesaikanPada;
   if (!waktu) return null;
@@ -380,11 +398,17 @@ const anakAktif = ref<TugasAnakSupir | null>(null);
 // TIDAK memengaruhi siapa yang menerima laporan -- untuk kategori
 // "Kendala Perjalanan", server tetap menyiarkan ke SELURUH orang tua di
 // rute yang sama, bukan cuma anak acuan ini (lihat catatan lengkap di
-// migrasi laporkan_kendala_perjalanan(), skema_database.sql). Diutamakan
-// anak pada sesi yang sedang difilter; kalau kosong, jatuh ke anak
-// manapun yang ditugaskan hari ini (lintas sesi).
+// migrasi laporkan_kendala_perjalanan(), skema_database.sql).
+//
+// SENGAJA HANYA dari tugasTerurut (sesi + sekolah yang sedang difilter),
+// TIDAK ADA fallback lintas sesi lagi -- fallback lama ke daftar anak
+// lintas-sesi adalah akar penyebab bug "lapor kendala di tab Sesi Pagi,
+// tapi tersimpan/tampil sebagai Sesi Sore" (lihat catatan daftarAnakSesiIni
+// di atas). Tombol pemicu fungsi ini juga sudah digerbang v-if agar cuma
+// tampil kalau tugasTerurut tidak kosong, jadi null di sini seharusnya
+// tidak pernah terjadi -- guard ini semata pengaman.
 const bukaKendalaModal = () => {
-  anakAktif.value = tugasTerurut.value[0] ?? daftarAnakUnik.value[0] ?? null;
+  anakAktif.value = tugasTerurut.value[0] ?? null;
   if (!anakAktif.value) return;
   modalKendalaTampil.value = true;
 };
@@ -513,10 +537,10 @@ const konfirmasiSelesaikanRute = async () => {
          yang belum ditandai selesai (lihat muatKendalaAktif() di script).
          Sengaja ditaruh menonjol di sini (bukan cuma di Riwayat Perjalanan)
          supaya supir tidak lupa menutup kendalanya begitu sudah beres. -->
-    <div v-if="daftarKendalaAktif.length > 0" class="bg-rose-50 border border-rose-200 rounded-2xl p-5 space-y-3">
+    <div v-if="daftarKendalaAktif.length > 0" ref="kendalaAktifSectionEl" class="bg-rose-50 border border-rose-200 rounded-2xl p-5 space-y-3">
       <h3 class="text-sm font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
         <AlertTriangle class="w-4 h-4" />
-        Kendala Aktif -- {{ daftarKendalaAktif.length }} Laporan Belum Teratasi
+        Kendala Aktif ({{ daftarKendalaAktif.length }} Laporan Belum Teratasi)
       </h3>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div
@@ -527,14 +551,16 @@ const konfirmasiSelesaikanRute = async () => {
           <div class="flex items-center justify-between gap-2">
             <span class="font-bold text-on-surface">
               {{ laporan.kategori === 'kendala_anak' ? `Kendala Anak: ${laporan.namaAnak}` : 'Kendala Perjalanan (Seluruh Rute)' }}
+              -- Sesi {{ laporan.jenisPerjalanan === 'sore' ? 'Sore' : 'Pagi' }}
             </span>
             <span
               class="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full"
               :class="laporan.status === 'ditindak' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'"
             >
-              {{ laporan.status === 'ditindak' ? 'Sedang Ditindak' : 'Baru Dilaporkan' }}
+              {{ laporan.status === 'ditindak' ? 'Diproses' : 'Belum Ditangani' }}
             </span>
           </div>
+          <p class="text-[10px] text-on-surface-variant">Waktu Lapor: {{ new Date(laporan.dibuatPada).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }} WIB</p>
           <p class="text-on-surface-variant leading-relaxed">{{ laporan.deskripsi }}</p>
           <TombolUtama
             tema="terang"
@@ -677,6 +703,28 @@ const konfirmasiSelesaikanRute = async () => {
                   <span>Tugas rute ini telah diselesaikan{{ waktuRuteSelesai ? ` pada ${waktuRuteSelesai}` : '' }}.</span>
                 </div>
                 <template v-else>
+                  <!-- Peringatan kendala belum selesai -- BUKAN penghalang.
+                       Perjalanan anak sudah boleh ditandai selesai begitu
+                       semuaTitikSampaiTujuan true, terlepas dari status
+                       kendala; ini cuma pengingat supaya supir tidak lupa
+                       menindaklanjuti laporannya sendiri. -->
+                  <div
+                    v-if="semuaTitikSampaiTujuan && kendalaBelumSelesaiSesiIni"
+                    class="flex flex-col sm:flex-row sm:items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3 text-[11px]"
+                  >
+                    <div class="flex items-center gap-2 text-amber-800 flex-grow">
+                      <AlertTriangle class="w-4 h-4 flex-shrink-0" />
+                      <span>Masih terdapat laporan kendala yang belum diselesaikan.</span>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                      <TombolUtama tema="terang" varian="garis-luar" class="!py-1 text-[10px]" @click="gulirKeKendalaAktif">
+                        Periksa Kendala
+                      </TombolUtama>
+                      <TombolUtama tema="terang" varian="utama" class="!py-1 text-[10px] bg-amber-600 hover:bg-amber-700" @click="modalSelesaiTampil = true">
+                        Tetap Selesaikan Tugas
+                      </TombolUtama>
+                    </div>
+                  </div>
                   <TombolUtama
                     tema="terang"
                     varian="utama"
@@ -779,7 +827,7 @@ const konfirmasiSelesaikanRute = async () => {
                lengkap di bukaKendalaModal(). Menggantikan tombol "Kendala"
                yang sebelumnya ada di tiap kartu anak. -->
           <TombolUtama
-            v-if="daftarAnakUnik.length > 0"
+            v-if="tugasTerurut.length > 0"
             tema="terang"
             varian="garis-luar"
             class="!border-rose-200 !text-rose-600 hover:!bg-rose-50 gap-1.5 flex-shrink-0 !py-1.5 text-xs"
@@ -805,7 +853,7 @@ const konfirmasiSelesaikanRute = async () => {
     <ModalLaporanKendala
       :tampil="modalKendalaTampil"
       :anak="anakAktif"
-      :daftar-anak="daftarAnakUnik"
+      :daftar-anak="daftarAnakSesiIni"
       :sedang-mengirim="sedangMemproses"
       @tutup="modalKendalaTampil = false"
       @kirim-kendala="laporkanKendalaBaru"

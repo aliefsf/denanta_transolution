@@ -72,7 +72,7 @@ const labelKategoriKendala = (kategori: LaporanKendalaAdmin['kategori']) =>
   kategori === 'kendala_anak' ? 'Kendala Anak' : 'Kendala Perjalanan';
 
 const labelStatusKendala = (status: LaporanKendalaAdmin['status']) =>
-  status === 'baru' ? 'Baru' : status === 'ditindak' ? 'Ditindak' : 'Selesai';
+  status === 'baru' ? 'Belum Ditangani' : status === 'ditindak' ? 'Diproses' : 'Selesai';
 
 const kelasStatusKendala = (status: LaporanKendalaAdmin['status']) => {
   if (status === 'baru') return 'bg-rose-50 text-rose-700 border border-rose-200';

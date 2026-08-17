@@ -71,7 +71,7 @@ const labelKategoriKendala = (kategori: LaporanKendalaSupir['kategori']) =>
   kategori === 'kendala_anak' ? 'Kendala Anak' : 'Kendala Perjalanan';
 
 const labelStatusKendala = (status: LaporanKendalaSupir['status']) =>
-  status === 'baru' ? 'Baru' : status === 'ditindak' ? 'Ditindak' : 'Selesai';
+  status === 'baru' ? 'Belum Ditangani' : status === 'ditindak' ? 'Diproses' : 'Selesai';
 
 const kelasStatusKendala = (status: LaporanKendalaSupir['status']) => {
   if (status === 'baru') return 'bg-rose-50 text-rose-700 border border-rose-200';

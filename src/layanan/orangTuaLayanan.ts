@@ -370,11 +370,18 @@ export async function ambilPerjalananHariIniByAnakIds(anakIds: string[]): Promis
   // SEMUA laporan kendala_perjalanan yang supir_id-nya cocok dengan supir
   // anak-anak akun ini pada tanggal yang sama, lalu ditempelkan ke SETIAP
   // baris perjalanan yang relevan (bukan cuma anak acuannya).
+  //
+  // PENTING: ditempel HANYA ke baris dengan jenis_perjalanan (sesi) yang
+  // SAMA dengan sesi rujukan laporan -- SEBELUMNYA dicocokkan hanya lewat
+  // supir_id, jadi kendala yang dilaporkan utk sesi PAGI ikut nempel juga ke
+  // baris SORE anak yang sama (dan sebaliknya), padahal kendala rute cuma
+  // relevan utk perjalanan yang sedang berlangsung saat itu -- armada sesi
+  // sore belum tentu bermasalah hanya karena armada pagi bermasalah.
   const supirIdsUnik = Array.from(new Set(perjalananList.map((p) => p.supir_id).filter((id): id is string => !!id)));
   if (supirIdsUnik.length > 0) {
     const { data: kendalaRute, error: errKendala } = await client
       .from('laporan_kendala')
-      .select('*, perjalanan!inner(supir_id, tanggal_perjalanan)')
+      .select('*, perjalanan!inner(supir_id, tanggal_perjalanan, jenis_perjalanan)')
       .eq('kategori', 'kendala_perjalanan')
       .in('perjalanan.supir_id', supirIdsUnik)
       .eq('perjalanan.tanggal_perjalanan', hariIni);
@@ -382,7 +389,10 @@ export async function ambilPerjalananHariIniByAnakIds(anakIds: string[]): Promis
       for (const p of perjalananList) {
         const idSudahAda = new Set((p.laporan_kendala ?? []).map((k: any) => k.id));
         const tambahan = (kendalaRute as any[]).filter(
-          (k) => k.perjalanan?.supir_id === p.supir_id && !idSudahAda.has(k.id)
+          (k) =>
+            k.perjalanan?.supir_id === p.supir_id &&
+            k.perjalanan?.jenis_perjalanan === p.jenis_perjalanan &&
+            !idSudahAda.has(k.id)
         );
         if (tambahan.length > 0) {
           p.laporan_kendala = [...(p.laporan_kendala ?? []), ...tambahan];
