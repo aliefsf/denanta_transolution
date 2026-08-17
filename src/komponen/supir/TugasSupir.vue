@@ -441,19 +441,6 @@ const konfirmasiSelesaikanRute = async () => {
         <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Tugas Hari Ini</h1>
         <p class="text-xs text-on-surface-variant">Ikuti urutan rute optimal untuk efisiensi waktu penjemputan siswa.</p>
       </div>
-      <!-- Satu tombol laporan kendala untuk seluruh rute -- lihat catatan
-           lengkap di bukaKendalaModal(). Menggantikan tombol "Kendala" yang
-           sebelumnya ada di tiap kartu anak. -->
-      <TombolUtama
-        v-if="daftarAnakUnik.length > 0"
-        tema="terang"
-        varian="garis-luar"
-        class="!border-rose-200 !text-rose-600 hover:!bg-rose-50 gap-1.5 flex-shrink-0"
-        @click="bukaKendalaModal"
-      >
-        <AlertTriangle class="w-4 h-4" />
-        Lapor Kendala
-      </TombolUtama>
     </div>
 
     <!-- Filter Bar -->
@@ -703,7 +690,22 @@ const konfirmasiSelesaikanRute = async () => {
 
       <!-- Student Cards List -->
       <div class="space-y-4">
-        <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Daftar Penjemputan Siswa</h3>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 class="text-sm font-bold text-on-surface uppercase tracking-wider">Daftar Penjemputan Siswa</h3>
+          <!-- Satu tombol laporan kendala untuk seluruh rute -- lihat catatan
+               lengkap di bukaKendalaModal(). Menggantikan tombol "Kendala"
+               yang sebelumnya ada di tiap kartu anak. -->
+          <TombolUtama
+            v-if="daftarAnakUnik.length > 0"
+            tema="terang"
+            varian="garis-luar"
+            class="!border-rose-200 !text-rose-600 hover:!bg-rose-50 gap-1.5 flex-shrink-0 !py-1.5 text-xs"
+            @click="bukaKendalaModal"
+          >
+            <AlertTriangle class="w-3.5 h-3.5" />
+            Lapor Kendala
+          </TombolUtama>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <KartuTugas
