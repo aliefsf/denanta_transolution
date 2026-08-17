@@ -216,15 +216,15 @@ function formatStatusSaatKejadian(status: string | null | undefined): string {
 <template>
   <div class="space-y-6">
     <!-- Header with back button -->
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-4 soft-shadow">
       <button
         @click="emit('kembali')"
-        class="p-2 bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/30 rounded-xl text-on-surface-variant hover:text-on-surface cursor-pointer transition-colors"
+        class="p-2 bg-surface-container hover:bg-primary-container/30 border border-outline-variant/30 rounded-xl text-on-surface-variant hover:text-primary cursor-pointer transition-colors flex-shrink-0"
       >
         <ArrowLeft class="w-5 h-5" />
       </button>
       <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Detail Perjalanan Siswa</h1>
+        <h1 class="text-lg font-bold text-on-background tracking-tight">Detail Perjalanan Siswa</h1>
         <p class="text-xs text-on-surface-variant">Informasi pergerakan armada dan riwayat absensi harian.</p>
       </div>
     </div>

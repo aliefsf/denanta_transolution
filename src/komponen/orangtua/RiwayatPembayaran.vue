@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Download, AlertTriangle, FileText, Send, CalendarClock, CheckCircle2, RefreshCw, X, Trash2, ShieldAlert, Lock } from 'lucide-vue-next';
+import { Download, AlertTriangle, FileText, Send, CalendarClock, CheckCircle2, RefreshCw, X, Trash2, ShieldAlert, Lock, Wallet } from 'lucide-vue-next';
 import { supabase } from '../../layanan/supabase';
 import { prosesPembayaranMidtrans } from '../../layanan/midtransLayanan';
 import { formatMataUang } from '../../bantuan/formatMataUang';
@@ -622,9 +622,14 @@ const ajukanPenundaan = async () => {
       @tutup="toastTampil = false"
     />
 
-    <div>
-      <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Histori & Administrasi Pembayaran</h1>
-      <p class="text-xs text-on-surface-variant">Kelola riwayat tagihan bulanan dan pengajuan penangguhan biaya.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <Wallet class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-background tracking-tight">Histori & Administrasi Pembayaran</h1>
+        <p class="text-xs text-on-surface-variant">Kelola riwayat tagihan bulanan dan pengajuan penangguhan biaya.</p>
+      </div>
     </div>
 
     <div v-if="errorMuat" class="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-4 py-3 rounded-xl">

@@ -214,12 +214,17 @@ const simpanEditAnak = async () => {
       @tutup="toastTampil = false"
     />
 
-    <div class="flex justify-between items-center">
-      <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Pantau Anak</h1>
-        <p class="text-xs text-on-surface-variant">Pilih salah satu profil anak Anda untuk memantau detail perjalanan live.</p>
+    <div class="flex justify-between items-center gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <Users class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-background tracking-tight">Pantau Anak</h1>
+          <p class="text-xs text-on-surface-variant">Pilih salah satu profil anak Anda untuk memantau detail perjalanan live.</p>
+        </div>
       </div>
-      <TombolUtama tema="terang" varian="utama" class="gap-1 text-xs" @click="navigasiKeDaftarAnak">
+      <TombolUtama tema="terang" varian="utama" class="gap-1 text-xs flex-shrink-0" @click="navigasiKeDaftarAnak">
         <Plus class="w-4 h-4" />
         Tambah Anak
       </TombolUtama>
@@ -262,11 +267,11 @@ const simpanEditAnak = async () => {
       <div
         v-for="anak in daftarAnak"
         :key="anak.id"
-        class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 soft-shadow flex flex-col justify-between space-y-6"
+        class="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 soft-shadow flex flex-col justify-between space-y-6 hover:border-primary/30 transition-colors"
       >
         <div class="flex items-start gap-4">
-          <img v-if="anak.foto" :src="anak.foto" :alt="anak.nama" class="w-16 h-16 rounded-2xl object-cover border border-outline-variant/30" />
-          <div v-else class="w-16 h-16 rounded-2xl bg-primary-container/20 border border-outline-variant/30 flex items-center justify-center text-primary font-bold text-lg">
+          <img v-if="anak.foto" :src="anak.foto" :alt="anak.nama" class="w-16 h-16 rounded-2xl object-cover border-2 border-primary-container/50 flex-shrink-0" />
+          <div v-else class="w-16 h-16 rounded-2xl bg-primary-container/20 border-2 border-primary-container/50 flex items-center justify-center text-primary font-bold text-lg flex-shrink-0">
             {{ anak.nama.charAt(0) }}
           </div>
           <div class="space-y-1 flex-grow">

@@ -1061,9 +1061,14 @@ const LABEL_ALASAN_CUTI: Record<string, string> = {
       @tutup="toastTampil = false"
     />
 
-    <div>
-      <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Pengaturan Jadwal & Absensi</h1>
-      <p class="text-xs text-on-surface-variant">Atur absen harian anak, jadwal mingguan, dan pengajuan cuti libur.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <CalendarDays class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-background tracking-tight">Pengaturan Jadwal & Absensi</h1>
+        <p class="text-xs text-on-surface-variant">Atur absen harian anak, jadwal mingguan, dan pengajuan cuti libur.</p>
+      </div>
     </div>
 
     <!-- Empty State -->

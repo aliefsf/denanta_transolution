@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { ChevronDown, ChevronUp } from 'lucide-vue-next';
+import { ChevronDown, ChevronUp, History } from 'lucide-vue-next';
 import PenilaianSupir from './PenilaianSupir.vue';
 import MemuatUtama from '../umum/MemuatUtama.vue';
 import { useDataOrangTua } from '../../komposabel/useDataOrangTua';
@@ -166,9 +166,14 @@ const toggleExpand = (id: string) => {
   <div class="space-y-6 relative min-h-[200px]">
     <MemuatUtama tema="terang" :tampil="sedangMemuatAnak || sedangMemuatRiwayat" pesan="Memuat riwayat perjalanan..." />
 
-    <div>
-      <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Histori Perjalanan Siswa</h1>
-      <p class="text-xs text-on-surface-variant">Tinjau seluruh riwayat ketibaan dan kepulangan anak Anda.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <History class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-background tracking-tight">Histori Perjalanan Siswa</h1>
+        <p class="text-xs text-on-surface-variant">Tinjau seluruh riwayat ketibaan dan kepulangan anak Anda.</p>
+      </div>
     </div>
 
     <div v-if="error" class="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-4 py-3 rounded-xl">
