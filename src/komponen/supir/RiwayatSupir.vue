@@ -367,7 +367,6 @@ const labelStatus = (status: string) => status === 'dibatalkan' ? 'Dibatalkan' :
                 >
                   <CheckCircle2 class="w-3.5 h-3.5" /> Tandai Selesai
                 </button>
-                <span v-if="laporan.status === 'selesai'" class="text-on-surface-variant italic">Selesai</span>
                 <button
                   type="button"
                   title="Hapus Laporan"
