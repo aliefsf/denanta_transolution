@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { FileDown, Users, Star, Award, Wallet, Printer, Loader2, Radio, AlertTriangle, User, MessageCircle, Eye, History, Truck, Calendar } from 'lucide-vue-next';
+import { FileDown, Users, Star, Award, Wallet, Printer, Loader2, Radio, AlertTriangle, User, MessageCircle, Eye, History, Truck, Calendar, ClipboardList } from 'lucide-vue-next';
 import { tautanWhatsapp } from '../../bantuan/nomorTelepon';
 import FilterLaporan from './FilterLaporan.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
@@ -402,10 +402,15 @@ const eksporExcel = async () => {
       @tutup="toastTampil = false"
     />
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Kelola Laporan</h1>
-        <p class="text-xs text-on-surface-variant">Tinjau performa armada, pertumbuhan pelanggan, dan laporan kendala supir.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <ClipboardList class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-background tracking-tight">Kelola Laporan</h1>
+          <p class="text-xs text-on-surface-variant">Tinjau performa armada, pertumbuhan pelanggan, dan laporan kendala supir.</p>
+        </div>
       </div>
 
       <div class="flex gap-2">

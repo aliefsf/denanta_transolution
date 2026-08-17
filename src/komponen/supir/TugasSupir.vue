@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { Navigation, Loader2, ArrowDownWideNarrow, ArrowUpNarrowWide, CheckCircle2, Lock, PlayCircle, AlertTriangle } from 'lucide-vue-next';
+import { Navigation, Loader2, ArrowDownWideNarrow, ArrowUpNarrowWide, CheckCircle2, Lock, PlayCircle, AlertTriangle, Route } from 'lucide-vue-next';
 import { useLokasiSupir } from '../../komposabel/useLokasiSupir';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import ModalUtama from '../umum/ModalUtama.vue';
@@ -513,9 +513,12 @@ const konfirmasiSelesaikanRute = async () => {
       @tutup="toastTampil = false"
     />
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <Route class="w-5 h-5 text-primary" />
+      </div>
       <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Tugas Hari Ini</h1>
+        <h1 class="text-lg font-bold text-on-background tracking-tight">Tugas Hari Ini</h1>
         <p class="text-xs text-on-surface-variant">Ikuti urutan rute optimal untuk efisiensi waktu penjemputan siswa.</p>
       </div>
     </div>

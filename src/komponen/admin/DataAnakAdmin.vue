@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Trash2, Eye, MapPin, Phone, User, Loader2, AlertTriangle, Search } from 'lucide-vue-next';
+import { Trash2, Eye, MapPin, Phone, User, Loader2, AlertTriangle, Search, GraduationCap } from 'lucide-vue-next';
 import ModalUtama from '../umum/ModalUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
@@ -126,9 +126,14 @@ const bukaDetail = (anak: AnakDenganRingkasan) => {
       @tutup="toastTampil = false"
     />
 
-    <div>
-      <h1 class="text-xl font-bold text-on-surface uppercase tracking-wider">Data Siswa Antar Jemput</h1>
-      <p class="text-xs text-on-surface-variant">Tinjau profil sekolah anak, kelas, dan status kelayakan langganan. Pendaftaran siswa baru dilakukan melalui wizard berlangganan orang tua.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <GraduationCap class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-surface tracking-tight">Data Siswa Antar Jemput</h1>
+        <p class="text-xs text-on-surface-variant">Tinjau profil sekolah anak, kelas, dan status kelayakan langganan. Pendaftaran siswa baru dilakukan melalui wizard berlangganan orang tua.</p>
+      </div>
     </div>
 
     <!-- Filters -->

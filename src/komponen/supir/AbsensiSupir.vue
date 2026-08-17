@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { CheckCircle2, XCircle, HelpCircle, Clock, ClipboardList, Lock, LockOpen, Loader2, AlertTriangle, RefreshCw } from 'lucide-vue-next';
+import { CheckCircle2, XCircle, HelpCircle, Clock, ClipboardList, Lock, LockOpen, Loader2, AlertTriangle, RefreshCw, CalendarCheck } from 'lucide-vue-next';
 import TombolUtama from '../umum/TombolUtama.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import {
@@ -127,9 +127,14 @@ const pilihStatus = async (status: StatusKehadiran) => {
       @tutup="toastTampil = false"
     />
 
-    <div>
-      <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Absensi Harian Supir</h1>
-      <p class="text-xs text-on-surface-variant">Isi kesiapan Anda setiap hari agar dapat menerima penugasan dari Admin.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <CalendarCheck class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-background tracking-tight">Absensi Harian Supir</h1>
+        <p class="text-xs text-on-surface-variant">Isi kesiapan Anda setiap hari agar dapat menerima penugasan dari Admin.</p>
+      </div>
     </div>
 
     <div v-if="sedangMemuat" class="flex items-center justify-center py-16">

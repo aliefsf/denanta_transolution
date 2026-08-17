@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-vue-next';
+import { Loader2, AlertTriangle, CheckCircle2, History } from 'lucide-vue-next';
 import {
   ambilRiwayatPerjalanan,
   ambilLaporanKendalaSupir,
@@ -121,9 +121,14 @@ const labelStatus = (status: string) => status === 'dibatalkan' ? 'Dibatalkan' :
       @tutup="toastTampil = false"
     />
 
-    <div>
-      <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Riwayat Perjalanan & Tugas</h1>
-      <p class="text-xs text-on-surface-variant">Tinjau rangkuman produktivitas dan perjalanan armada Anda yang telah selesai.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <History class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-background tracking-tight">Riwayat Perjalanan & Tugas</h1>
+        <p class="text-xs text-on-surface-variant">Tinjau rangkuman produktivitas dan perjalanan armada Anda yang telah selesai.</p>
+      </div>
     </div>
 
     <!-- Filter Bar -->

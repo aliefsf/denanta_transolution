@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { MapPin, Navigation, Loader2 } from 'lucide-vue-next';
+import { MapPin, Navigation, Loader2, Radar } from 'lucide-vue-next';
 import PetaGlobal from './PetaGlobal.vue';
 import { ambilPosisiSupirAktif, type PosisiSupirPeta } from '../../layanan/adminLayanan';
 import { pantauTabelAdminRealtime } from '../../layanan/realtimeLayanan';
@@ -96,10 +96,15 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Pemantauan Armada Global</h1>
-        <p class="text-xs text-on-surface-variant">Pantau pergerakan GPS seluruh armada antar-jemput aktif secara real-time.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <Radar class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-background tracking-tight">Pemantauan Armada Global</h1>
+          <p class="text-xs text-on-surface-variant">Pantau pergerakan GPS seluruh armada antar-jemput aktif secara real-time.</p>
+        </div>
       </div>
 
       <!-- Live Sync status badge -->

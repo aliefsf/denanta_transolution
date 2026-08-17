@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Plus, Trash2, Pencil, MapPin, Loader2, AlertTriangle, X } from 'lucide-vue-next';
+import { Plus, Trash2, Pencil, MapPin, Loader2, AlertTriangle, X, School } from 'lucide-vue-next';
 import ModalUtama from '../umum/ModalUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
@@ -229,10 +229,15 @@ const sekolahTerfilter = computed(() => {
       @tutup="toastTampil = false"
     />
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-on-surface uppercase tracking-wider">Kelola Data Sekolah Mitra</h1>
-        <p class="text-xs text-on-surface-variant">Atur koordinat pemetaan sekolah mitra layanan antar-jemput.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <School class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-surface tracking-tight">Kelola Data Sekolah Mitra</h1>
+          <p class="text-xs text-on-surface-variant">Atur koordinat pemetaan sekolah mitra layanan antar-jemput.</p>
+        </div>
       </div>
 
       <TombolUtama tema="terang" varian="utama" class="gap-1.5 text-xs" @click="bukaTambah">

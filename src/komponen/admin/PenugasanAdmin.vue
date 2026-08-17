@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { Plus, Send, Loader2, AlertTriangle, Clock } from 'lucide-vue-next';
+import { Plus, Send, Loader2, AlertTriangle, Clock, Route } from 'lucide-vue-next';
 import ModalUtama from '../umum/ModalUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
@@ -283,10 +283,15 @@ const buatPenugasan = async () => {
       @tutup="toastTampil = false"
     />
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Penugasan Driver & Rute</h1>
-        <p class="text-xs text-on-surface-variant">Atur penugasan harian supir berdasarkan sekolah dan sesi rute.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <Route class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-background tracking-tight">Penugasan Driver & Rute</h1>
+          <p class="text-xs text-on-surface-variant">Atur penugasan harian supir berdasarkan sekolah dan sesi rute.</p>
+        </div>
       </div>
 
       <div class="flex items-center gap-2">

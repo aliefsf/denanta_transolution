@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { CheckCheck, Eye, EyeOff, Trash2 } from 'lucide-vue-next';
+import { CheckCheck, Eye, EyeOff, Trash2, Bell } from 'lucide-vue-next';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
 import MemuatUtama from '../umum/MemuatUtama.vue';
 import ModalUtama from '../umum/ModalUtama.vue';
@@ -117,10 +117,15 @@ const konfirmasiBersihkanSemua = async () => {
       @tutup="toastTampil = false"
     />
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Kotak Masuk Notifikasi</h1>
-        <p class="text-xs text-on-surface-variant">Pemberitahuan penugasan rute, laporan kendala, dan informasi sistem.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <Bell class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-background tracking-tight">Kotak Masuk Notifikasi</h1>
+          <p class="text-xs text-on-surface-variant">Pemberitahuan penugasan rute, laporan kendala, dan informasi sistem.</p>
+        </div>
       </div>
 
       <div class="flex items-center gap-2">

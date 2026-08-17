@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { User, Eye, Clock, AlertTriangle } from 'lucide-vue-next';
+import { User, Eye, Clock, AlertTriangle, Users } from 'lucide-vue-next';
 import ModalUtama from '../umum/ModalUtama.vue';
 import TombolUtama from '../umum/TombolUtama.vue';
 import NotifikasiUtama from '../umum/NotifikasiUtama.vue';
@@ -156,9 +156,14 @@ const pengajuanUntukModal = computed(() => {
       @tutup="toastTampil = false"
     />
 
-    <div>
-      <h1 class="text-xl font-bold text-on-surface uppercase tracking-wider">Kelola Daftar Pengguna (Wali Murid)</h1>
-      <p class="text-xs text-on-surface-variant">Tinjau status keaktifan berlangganan wali dan pengajuan penundaan pembayaran.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <Users class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-surface tracking-tight">Kelola Daftar Pengguna (Wali Murid)</h1>
+        <p class="text-xs text-on-surface-variant">Tinjau status keaktifan berlangganan wali dan pengajuan penundaan pembayaran.</p>
+      </div>
     </div>
 
     <!-- Filter Bar -->

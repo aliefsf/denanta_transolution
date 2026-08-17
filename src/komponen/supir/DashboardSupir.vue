@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { ClipboardList, UserCheck, Play, Loader2, AlertTriangle, CheckCircle2, XCircle, HelpCircle, ArrowRight, CalendarX } from 'lucide-vue-next';
+import { ClipboardList, UserCheck, Play, Loader2, AlertTriangle, CheckCircle2, XCircle, HelpCircle, ArrowRight, CalendarX, LayoutDashboard } from 'lucide-vue-next';
 import TombolUtama from '../umum/TombolUtama.vue';
 import { ambilTugasHariIni, type TugasAnakSupir, type StatusKehadiran } from '../../layanan/supirLayanan';
 import { ambilTanggalWibSekarang } from '../../bantuan/waktuSimulasi';
@@ -100,10 +100,15 @@ const infoStatusKehadiran = computed(() => {
 
 <template>
   <div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-on-background uppercase tracking-wider">Dashboard Supir</h1>
-        <p class="text-xs text-on-surface-variant">Ringkasan tugas antar jemput Anda hari ini.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <LayoutDashboard class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-background tracking-tight">Dashboard Supir</h1>
+          <p class="text-xs text-on-surface-variant">Ringkasan tugas antar jemput Anda hari ini.</p>
+        </div>
       </div>
     </div>
 

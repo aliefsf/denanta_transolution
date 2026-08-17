@@ -307,10 +307,15 @@ function formatTanggalIndo(tanggalIso: string): string {
       @tutup="toastTampil = false"
     />
 
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div>
-        <h1 class="text-xl font-bold text-on-surface uppercase tracking-wider">Kelola Jadwal</h1>
-        <p class="text-xs text-on-surface-variant">Atur kalender operasional -- libur nasional, cuti bersama, libur sekolah, dan hari khusus tidak aktif. Data ini jadi acuan sistem menghitung hari efektif sekolah & estimasi biaya langganan.</p>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+          <CalendarDays class="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-on-surface tracking-tight">Kelola Jadwal</h1>
+          <p class="text-xs text-on-surface-variant">Atur kalender operasional -- libur nasional, cuti bersama, libur sekolah, dan hari khusus tidak aktif. Data ini jadi acuan sistem menghitung hari efektif sekolah & estimasi biaya langganan.</p>
+        </div>
       </div>
 
       <div v-if="halamanTab === 'kalender'" class="flex items-center gap-2">

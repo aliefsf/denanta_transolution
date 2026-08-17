@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Users, Truck, Navigation, Wallet, MapPinned } from 'lucide-vue-next';
+import { Users, Truck, Navigation, Wallet, MapPinned, LayoutDashboard } from 'lucide-vue-next';
 import { formatMataUang } from '../../bantuan/formatMataUang';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 import { ambilRingkasanDashboard } from '../../layanan/adminLayanan';
@@ -55,9 +55,14 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-xl font-bold text-on-surface tracking-tight">Dashboard Administrator</h1>
-      <p class="text-sm text-on-surface-variant">Ringkasan status operasional armada dan rekonsiliasi billing harian.</p>
+    <div class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-5 soft-shadow">
+      <div class="w-11 h-11 rounded-xl bg-primary-container/30 flex items-center justify-center flex-shrink-0">
+        <LayoutDashboard class="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-on-surface tracking-tight">Dashboard Administrator</h1>
+        <p class="text-sm text-on-surface-variant">Ringkasan status operasional armada dan rekonsiliasi billing harian.</p>
+      </div>
     </div>
 
     <div v-if="errorPesan" class="bg-error-container/40 border border-error/20 text-error p-3.5 rounded-xl text-xs">
