@@ -90,14 +90,19 @@ const PETA_TIPE_UMUM: Record<NotifikasiRow['tipe'], InfoTampilanNotifikasi> = {
 
 /**
  * Warna garis vertikal di kiri kartu notifikasi -- hijau utk kabar baik,
- * merah utk kabar buruk, warna primer (netral) utk sisanya. Dipakai
- * bersama oleh NotifikasiOrangTua.vue, NotifikasiSupir.vue, dan
- * NotifikasiAdmin.vue supaya konsisten di seluruh peran.
+ * merah utk kabar buruk, ABU-ABU (BUKAN warna primer/teal aplikasi) utk
+ * sisanya yang netral. Sengaja tidak dipakai warna primer di sini --
+ * warna primer tema ini (#006b5a) sendiri sudah teal gelap yang mirip
+ * hijau, jadi kalau dipakai sebagai "netral" hasilnya keliatan sama saja
+ * dengan kategori "positif" (sama-sama kehijauan), menghilangkan gunanya
+ * pembedaan 3 warna ini. Dipakai bersama oleh NotifikasiOrangTua.vue,
+ * NotifikasiSupir.vue, dan NotifikasiAdmin.vue supaya konsisten di seluruh
+ * peran.
  */
 export function warnaGarisNotifikasi(sentimen: SentimenNotifikasi): string {
   if (sentimen === 'positif') return 'bg-emerald-500';
   if (sentimen === 'negatif') return 'bg-rose-500';
-  return 'bg-primary';
+  return 'bg-slate-400';
 }
 
 export function infoTampilanNotifikasi(
