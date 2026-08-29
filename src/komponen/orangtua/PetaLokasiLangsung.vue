@@ -189,9 +189,9 @@ function buatPetaDasar(container: HTMLElement): L.Map {
     (props.lintangRumah + props.lintangSekolah) / 2,
     (props.bujurRumah + props.bujurSekolah) / 2
   ], 13);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 20
+    maxZoom: 19
   }).addTo(map);
   return map;
 }

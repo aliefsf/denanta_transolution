@@ -207,9 +207,9 @@ onMounted(() => {
   const mapInstance = L.map(wadahPeta.value).setView([props.lintangSekolah, props.bujurSekolah], 13);
   peta = mapInstance;
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 20
+    maxZoom: 19
   }).addTo(mapInstance);
 
   renderPeta();

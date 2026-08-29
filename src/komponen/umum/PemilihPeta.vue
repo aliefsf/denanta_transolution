@@ -311,13 +311,15 @@ function buatPeta(container: HTMLElement, lat: number, lng: number, interaktif: 
     keyboard: interaktif
   }).setView([lat, lng], 15);
 
-  // Tile CartoDB: Dark Matter untuk halaman bertema gelap, Voyager (terang) untuk halaman bertema Material terang.
-  const tileUrl = props.tema === 'terang'
-    ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  // CartoDB (voyager/dark_all) SEKARANG mewajibkan API key -- tanpa key,
+  // tile-nya diganti watermark "API KEY REQUIRED" oleh CARTO. Diganti ke
+  // tile OpenStreetMap standar (gratis, tanpa key) untuk kedua tema --
+  // variasi terang/gelap CartoDB jadi tidak tersedia lagi sampai ada
+  // alternatif tile gratis-tanpa-key yang mendukung tema gelap.
+  const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   L.tileLayer(tileUrl, {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    maxZoom: 20
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
   }).addTo(map);
 
   return map;

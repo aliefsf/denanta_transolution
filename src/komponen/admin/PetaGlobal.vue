@@ -246,9 +246,9 @@ onMounted(() => {
   const mapInstance = L.map(wadahPeta.value).setView([-0.9471, 100.4172], 13); // Center Kota Padang
   peta = mapInstance;
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 20
+    maxZoom: 19
   }).addTo(mapInstance);
 
   renderMarkers();
