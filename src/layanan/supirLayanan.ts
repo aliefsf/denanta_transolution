@@ -860,6 +860,31 @@ export async function perbaruiStatusBertugas(sedangBertugas: boolean): Promise<v
   if (error) throw error;
 }
 
+/**
+ * Live Tracking GPS: baca kebenaran `sedang_bertugas` LANGSUNG dari database
+ * (bukan dari localStorage/state frontend), memakai syarat "masih hari ini
+ * (WIB)" yang SAMA PERSIS dengan ambilPosisiSupirAktif() (adminLayanan.ts) --
+ * supaya sisi Supir dan sisi Admin/Orang Tua selalu sepakat soal kapan sesi
+ * tugas dianggap masih aktif. Dipakai TugasSupir.vue saat halaman
+ * dimuat/dibuka ulang untuk memutuskan apakah GPS (watchPosition) perlu
+ * otomatis dilanjutkan lagi tanpa supir harus menekan "Mulai Bertugas" ulang.
+ */
+export async function ambilStatusBertugasSendiri(): Promise<boolean> {
+  const client = klienWajibAda();
+  const supirId = await idSupirWajibAda();
+  const hariIni = ambilTanggalWibSekarang();
+
+  const { data, error } = await client
+    .from('supir')
+    .select('sedang_bertugas, sedang_bertugas_diaktifkan_pada')
+    .eq('id', supirId)
+    .eq('sedang_bertugas', true)
+    .gte('sedang_bertugas_diaktifkan_pada', `${hariIni}T00:00:00+07:00`)
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
+}
+
 export async function perbaruiProfilSupir(data: PerubahanProfilSupir): Promise<void> {
   const client = klienWajibAda();
   const supirId = await idSupirWajibAda();

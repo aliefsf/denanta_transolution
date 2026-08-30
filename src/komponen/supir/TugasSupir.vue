@@ -14,6 +14,7 @@ import {
   laporkanKendala,
   selesaikanRuteHariIni,
   perbaruiStatusBertugas,
+  ambilStatusBertugasSendiri,
   ambilLaporanKendalaSupir,
   perbaruiStatusLaporanKendalaSupir,
   type TugasAnakSupir,
@@ -101,18 +102,53 @@ const sesiSaatIniAktif = computed(() => (sesiTerpilih.value === 'pagi' ? sesiPag
 // ditugaskan; cocok persis -> tetap aktif (survive refresh), beda (mis.
 // abis dibatalkan+ditugaskan ulang) -> kunci lagi & bersihkan localStorage
 // basi supaya tidak dicek ulang terus-menerus.
-const sinkronkanGerbangSesi = () => {
+//
+// PENTING: localStorage cuma dipakai untuk tahu perjalananId mana yang
+// tercakup sesi ini (informasi yang memang tidak ada di kolom
+// `sedang_bertugas` yang sifatnya global, bukan per pagi/sore) -- kebenaran
+// AKHIR soal "apakah tracking masih boleh dianggap aktif" tetap dari
+// database (ambilStatusBertugasSendiri()), BUKAN dari localStorage semata.
+// Ini memperbaiki bug: kalau supir menutup tab tanpa "Selesaikan Tugas" lalu
+// buka lagi/login ulang, localStorage-nya sendiri sebenarnya tetap cocok,
+// tapi GPS (watchPosition) tidak pernah otomatis dilanjutkan -- akibatnya
+// posisiSaatIni tetap null dan marker di halaman ini sendiri tidak pernah
+// muncul lagi walau status "sedang bertugas" masih benar di database.
+const sinkronkanGerbangSesi = async () => {
+  let dbMasihAktif = false;
+  try {
+    dbMasihAktif = await ambilStatusBertugasSendiri();
+  } catch {
+    // Gagal cek DB (mis. jaringan sesaat) -- jangan langsung kunci paksa,
+    // biarkan hasil localStorage sebelumnya yang menentukan sementara.
+    dbMasihAktif = sesiPagiAktif.value || sesiSoreAktif.value;
+  }
+
+  let adaSesiAktif = false;
   for (const sesi of ['pagi', 'sore'] as const) {
     const snapshot = bacaSnapshotSesi(sesi);
     const idSekarang = perjalananIdSesiSaatIni(sesi);
-    const cocok = snapshot !== null && idSekarang.length > 0 && JSON.stringify(snapshot) === JSON.stringify(idSekarang);
+    const cocokSnapshot = snapshot !== null && idSekarang.length > 0 && JSON.stringify(snapshot) === JSON.stringify(idSekarang);
+    // Database adalah sumber kebenaran akhir -- kalau DB bilang TIDAK sedang
+    // bertugas (mis. sudah ditandai selesai dari perangkat lain, atau hari
+    // sudah berganti), sesi manapun TIDAK dianggap aktif walau snapshot lama
+    // masih cocok.
+    const cocok = cocokSnapshot && dbMasihAktif;
     if (sesi === 'pagi') sesiPagiAktif.value = cocok;
     else sesiSoreAktif.value = cocok;
     if (snapshot !== null && !cocok) hapusSnapshotSesi(sesi);
+    if (cocok) adaSesiAktif = true;
+  }
+
+  // Sesi masih aktif (survive refresh/tutup tab/login ulang) tapi GPS di
+  // browser ini belum berjalan -- lanjutkan otomatis TANPA memaksa supir
+  // menekan "Mulai Bertugas" lagi, sesuai perilaku yang diharapkan: status
+  // persisten dari database, bukan cuma tombol yang kebetulan terkunci.
+  if (adaSesiAktif && !sedangMelacak.value) {
+    mulaiLacak();
   }
 };
 
-const { mulaiLacak, errorLacak: errorLokasi, posisiSaatIni, mulaiSimulasiPergerakan, sedangSimulasi } = useLokasiSupir();
+const { mulaiLacak, errorLacak: errorLokasi, posisiSaatIni, sedangMelacak, mulaiSimulasiPergerakan, sedangSimulasi } = useLokasiSupir();
 
 const mulaiBertugas = () => {
   mulaiLacak();
@@ -167,7 +203,7 @@ const muatTugasHariIni = async () => {
   try {
     const hariIni = ambilTanggalWibSekarang();
     daftarTugas.value = await denganBatasWaktu(ambilTugasHariIni(hariIni), 20000, 'Waktu memuat daftar tugas habis.');
-    sinkronkanGerbangSesi();
+    await sinkronkanGerbangSesi();
     await muatKendalaAktif();
   } catch (err: any) {
     picuToast(err.message || 'Gagal memuat daftar tugas.', 'error');
@@ -183,7 +219,7 @@ const muatTugasHariIniDiam = async () => {
   try {
     const hariIni = ambilTanggalWibSekarang();
     daftarTugas.value = await denganBatasWaktu(ambilTugasHariIni(hariIni), 20000, 'Waktu memuat daftar tugas habis.');
-    sinkronkanGerbangSesi();
+    await sinkronkanGerbangSesi();
   } catch (err: any) {
     console.error('Gagal menyegarkan daftar tugas (realtime):', err);
   }
