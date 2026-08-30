@@ -6,6 +6,7 @@ import { Maximize, Minimize } from 'lucide-vue-next';
 import type { TugasAnakSupir } from '../../layanan/supirLayanan';
 import { ambilRuteJalan } from '../../layanan/navigasiLayanan';
 import { svgBus, htmlLencanaIkonBerdenyut } from '../../bantuan/ikonPeta';
+import { hitungJarakKm } from '../../bantuan/jarak';
 
 interface Props {
   listAnak: TugasAnakSupir[];
@@ -111,6 +112,14 @@ const sedangMuatRute = ref(false);
 const ruteIkutiJalan = ref(true);
 let idPermintaanRute = 0;
 
+// Titik asal (posisi supir) tempat rute TERAKHIR dihitung -- dipakai untuk
+// memutuskan kapan rute perlu dihitung ulang saat GPS bergerak. TIDAK
+// dihitung ulang di SETIAP tick GPS (bisa tiap beberapa detik) karena akan
+// membanjiri server OSRM demo -- cukup kalau supir sudah berpindah cukup
+// jauh dari titik asal rute yang sedang ditampilkan.
+let asalRuteTerakhir: { lat: number; lng: number } | null = null;
+const AMBANG_HITUNG_ULANG_KM = 0.15; // ~150 meter
+
 const koordinatAnak = (anak: TugasAnakSupir): [number, number] => {
   return anak.jenisPerjalanan === 'pagi'
     ? [anak.lintangJemput, anak.bujurJemput]
@@ -144,11 +153,23 @@ const renderPeta = async () => {
   const permintaanSaatIni = ++idPermintaanRute;
   const koordinatRute: [number, number][] = [];
 
-  // Arah rute HARUS ikut jenis sesi -- sesi Pagi (jemput): supir mulai dari
-  // rumah anak satu-satu, berakhir di sekolah. Sesi Sore (antar pulang):
-  // supir mulai DARI sekolah (anak sudah di kendaraan), baru menuju rumah
-  // masing-masing anak -- arahnya kebalikan. Tanpa pembedaan ini, rute sore
-  // salah gambar seolah supir mulai dari rumah anak pertama, bukan sekolah.
+  // Titik AWAL rute WAJIB posisi supir saat ini (live location) -- BUKAN
+  // rumah/sekolah anak pertama. Rute yang ditampilkan harus mencerminkan
+  // perjalanan sungguhan kendaraan: dari lokasi supir sekarang menuju
+  // tujuan berikutnya, baru diteruskan ke tujuan-tujuan selanjutnya. Kalau
+  // posisi supir belum tersedia (GPS belum pernah dikirim), baru jatuh
+  // kembali ke titik pertama urutan jemput/sekolah seperti sebelumnya.
+  if (props.posisiSupir) {
+    koordinatRute.push([props.posisiSupir.lat, props.posisiSupir.lng]);
+    asalRuteTerakhir = { lat: props.posisiSupir.lat, lng: props.posisiSupir.lng };
+  } else {
+    asalRuteTerakhir = null;
+  }
+
+  // Arah rute setelah titik asal HARUS ikut jenis sesi -- sesi Pagi
+  // (jemput): berikutnya rumah anak satu-satu, berakhir di sekolah. Sesi
+  // Sore (antar pulang): berikutnya sekolah (anak sudah di kendaraan), baru
+  // menuju rumah masing-masing anak -- arahnya kebalikan.
   const sesiSore = props.listAnak[0]?.jenisPerjalanan === 'sore';
 
   // 1. Tambah penanda sekolah
@@ -246,6 +267,21 @@ watch(() => props.listAnak, () => {
 
 watch(() => props.posisiSupir, (posisi) => {
   perbaruiMarkerSupir(posisi);
+
+  // Marker digeser instan di atas (tanpa fetch OSRM) supaya tetap terasa
+  // real-time. Rute (garis) baru dihitung ULANG kalau supir sudah pindah
+  // cukup jauh (>150m) dari titik asal rute yang sedang tergambar, ATAU
+  // rute belum pernah punya titik asal sama sekali (posisi baru tersedia
+  // untuk pertama kalinya, mis. supir baru menekan "Mulai Bertugas").
+  if (!posisi) return;
+  if (!asalRuteTerakhir) {
+    renderPeta();
+    return;
+  }
+  const jarakKm = hitungJarakKm(asalRuteTerakhir.lat, asalRuteTerakhir.lng, posisi.lat, posisi.lng);
+  if (jarakKm >= AMBANG_HITUNG_ULANG_KM) {
+    renderPeta();
+  }
 }, { deep: true });
 
 onUnmounted(() => {

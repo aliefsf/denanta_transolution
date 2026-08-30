@@ -7,6 +7,7 @@ import { ambilSupirById } from '../../layanan/orangTuaLayanan';
 import { pantauSupirRealtime } from '../../layanan/realtimeLayanan';
 import { ambilRuteJalan } from '../../layanan/navigasiLayanan';
 import { svgRumah, svgSekolah, svgBus, htmlLencanaIkon } from '../../bantuan/ikonPeta';
+import { hitungJarakKm } from '../../bantuan/jarak';
 
 interface Props {
   lintangRumah?: number;
@@ -40,9 +41,17 @@ const halamanPenuhAktif = ref(false);
 // Posisi bus terkini (sumber tunggal kebenaran) -- disinkronkan ke peta
 // kecil & peta penuh (kalau sedang terbuka) tiap kali berubah.
 const posisiBusTerkini = ref<{ lat: number; lng: number } | null>(null);
-// Geometri rute (hasil OSRM atau fallback garis lurus) di-cache supaya
-// tidak fetch ulang ke OSRM tiap kali peta penuh dibuka.
-let jalurRuteCache: [number, number][] | null = null;
+
+// Garis rute -- dilacak terpisah dari marker (garisRuteKecil/garisRutePenuh)
+// supaya bisa di-setLatLngs() ulang tanpa membongkar-pasang layer, dan
+// asalRuteTerakhir dipakai memutuskan kapan rute perlu dihitung ULANG:
+// bukan tiap tick GPS (terlalu sering, membanjiri server OSRM demo), cukup
+// kalau supir sudah berpindah cukup jauh dari titik asal rute yang sedang
+// tergambar.
+let garisRuteKecil: L.Polyline | null = null;
+let garisRutePenuh: L.Polyline | null = null;
+let asalRuteTerakhir: { lat: number; lng: number } | null = null;
+const AMBANG_HITUNG_ULANG_KM = 0.15; // ~150 meter
 
 let langgananRealtime: { unsubscribe: () => void } | null = null;
 
@@ -113,6 +122,19 @@ function perbaruiPosisiBus(lat: number, lng: number) {
     if (penandaBusPenuh) penandaBusPenuh.setLatLng([lat, lng]);
     else penandaBusPenuh = L.marker([lat, lng], { icon: ikonBus, zIndexOffset: Z_INDEX_ARMADA }).addTo(petaPenuh).bindPopup('<strong class="text-slate-800">Posisi Armada</strong>');
   }
+
+  // Marker sudah digeser instan di atas (tanpa fetch OSRM) supaya tetap
+  // terasa real-time. Rute (garis) baru dihitung ULANG kalau posisi supir
+  // sudah berpindah cukup jauh (>150m) dari titik asal rute yang sedang
+  // tergambar, atau rute belum pernah punya titik asal sama sekali.
+  if (!asalRuteTerakhir) {
+    hitungUlangRute({ lat, lng });
+    return;
+  }
+  const jarakKm = hitungJarakKm(asalRuteTerakhir.lat, asalRuteTerakhir.lng, lat, lng);
+  if (jarakKm >= AMBANG_HITUNG_ULANG_KM) {
+    hitungUlangRute({ lat, lng });
+  }
 }
 
 function hapusPenandaBus() {
@@ -126,6 +148,10 @@ function hapusPenandaBus() {
 async function mulaiPelacakanSupir() {
   langgananRealtime?.unsubscribe();
   langgananRealtime = null;
+  // Supir yang ditugaskan bisa berganti (mis. dialihkan Admin) -- titik asal
+  // rute lama sudah tidak relevan, paksa hitung ulang begitu posisi supir
+  // baru diketahui.
+  asalRuteTerakhir = null;
 
   if (!props.supirId) {
     hapusPenandaBus();
@@ -154,34 +180,54 @@ async function mulaiPelacakanSupir() {
   });
 }
 
-// Ambil geometri rute (OSRM, fallback garis lurus) sekali saja & simpan di
-// cache modul supaya peta kecil & peta penuh tidak fetch OSRM berulang.
-async function ambilJalurRute(): Promise<[number, number][]> {
-  if (jalurRuteCache) return jalurRuteCache;
-  const titik: [number, number][] = [
-    [props.lintangRumah, props.bujurRumah],
-    [props.lintangSekolah, props.bujurSekolah]
-  ];
+// Titik AWAL rute WAJIB posisi supir saat ini (live location) -- BUKAN
+// titik Rumah. Rute yang ditampilkan ke orang tua harus mencerminkan
+// perjalanan sungguhan kendaraan: dari lokasi supir sekarang menuju
+// sekolah. Kalau posisi supir belum tersedia sama sekali (belum pernah
+// mengirim GPS), baru jatuh kembali ke titik Rumah sebagai perkiraan awal
+// (konsisten dengan fallback yang sama di mulaiPelacakanSupir()).
+async function hitungUlangRute(origin: { lat: number; lng: number } | null) {
+  const asal: [number, number] = origin
+    ? [origin.lat, origin.lng]
+    : [props.lintangRumah, props.bujurRumah];
+  asalRuteTerakhir = origin ?? null;
+
+  const titik: [number, number][] = [asal, [props.lintangSekolah, props.bujurSekolah]];
   sedangMuatRute.value = true;
   const jalurJalan = await ambilRuteJalan(titik);
   sedangMuatRute.value = false;
   ruteIkutiJalan.value = jalurJalan !== null;
-  jalurRuteCache = jalurJalan ?? titik;
-  return jalurRuteCache;
+  const jalur = jalurJalan ?? titik;
+
+  if (garisRuteKecil) garisRuteKecil.setLatLngs(jalur);
+  if (garisRutePenuh) garisRutePenuh.setLatLngs(jalur);
 }
 
 // Menggambar penanda rumah/sekolah + garis rute pada instance peta manapun
 // (dipakai baik oleh peta kecil maupun peta halaman penuh).
-async function gambarKontenPeta(map: L.Map) {
+async function gambarKontenPeta(map: L.Map, jenisPeta: 'kecil' | 'penuh') {
   L.marker([props.lintangRumah, props.bujurRumah], { icon: ikonRumah }).addTo(map)
     .bindPopup('<strong class="text-slate-800">Rumah Siswa</strong>');
   L.marker([props.lintangSekolah, props.bujurSekolah], { icon: ikonSekolah }).addTo(map)
     .bindPopup('<strong class="text-slate-800">Sekolah Siswa</strong>');
 
-  const jalur = await ambilJalurRute();
-  if (!map) return;
-  const garis = L.polyline(jalur, { color: '#0F9B8E', weight: 4, opacity: 0.8 }).addTo(map);
-  map.fitBounds(garis.getBounds(), { padding: [40, 40] });
+  // Gambar dulu pakai geometri yang sudah ada (kalau ada, mis. peta penuh
+  // dibuka setelah peta kecil sudah menghitung rute) supaya tidak kosong
+  // sesaat sebelum fetch OSRM baru selesai.
+  const asalAwal: [number, number] = posisiBusTerkini.value
+    ? [posisiBusTerkini.value.lat, posisiBusTerkini.value.lng]
+    : [props.lintangRumah, props.bujurRumah];
+  const garisAwal = L.polyline([asalAwal, [props.lintangSekolah, props.bujurSekolah]], {
+    color: '#0F9B8E', weight: 4, opacity: 0.8
+  }).addTo(map);
+
+  if (jenisPeta === 'kecil') garisRuteKecil = garisAwal;
+  else garisRutePenuh = garisAwal;
+
+  map.fitBounds(garisAwal.getBounds(), { padding: [40, 40] });
+
+  await hitungUlangRute(posisiBusTerkini.value);
+  if (map) map.fitBounds((jenisPeta === 'kecil' ? garisRuteKecil : garisRutePenuh)!.getBounds(), { padding: [40, 40] });
 }
 
 function buatPetaDasar(container: HTMLElement): L.Map {
@@ -206,7 +252,7 @@ const bukaHalamanPenuh = () => {
   nextTick(async () => {
     if (!wadahPetaPenuh.value) return;
     petaPenuh = buatPetaDasar(wadahPetaPenuh.value);
-    await gambarKontenPeta(petaPenuh);
+    await gambarKontenPeta(petaPenuh, 'penuh');
     if (posisiBusTerkini.value) {
       perbaruiPosisiBus(posisiBusTerkini.value.lat, posisiBusTerkini.value.lng);
     }
@@ -220,13 +266,14 @@ function tutupHalamanPenuh() {
     petaPenuh.remove();
     petaPenuh = null;
     penandaBusPenuh = null;
+    garisRutePenuh = null;
   }
 }
 
 onMounted(async () => {
   if (!wadahPeta.value) return;
   peta = buatPetaDasar(wadahPeta.value);
-  await gambarKontenPeta(peta);
+  await gambarKontenPeta(peta, 'kecil');
   mulaiPelacakanSupir();
 });
 
