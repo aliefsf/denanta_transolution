@@ -65,7 +65,7 @@ const konfirmasiLogout = async () => {
 // "Daftar Pengguna".
 const menuList = [
   { nama: 'Dashboard', id: 'dashboard', ikon: LayoutDashboard },
-  { nama: 'Pemantauan Global', id: 'pemantauan', ikon: Map },
+  { nama: 'Monitoring Supir', id: 'pemantauan', ikon: Map },
   { nama: 'Data Supir', id: 'supir', ikon: Truck },
   { nama: 'Daftar Pengguna', id: 'pengguna', ikon: UserCheck },
   { nama: 'Data Anak', id: 'anak', ikon: Users },
