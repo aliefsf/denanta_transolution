@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { Maximize2, X } from 'lucide-vue-next';
 import { ambilSupirById } from '../../layanan/orangTuaLayanan';
 import { pantauSupirRealtime } from '../../layanan/realtimeLayanan';
-import { ambilRuteJalan } from '../../layanan/navigasiLayanan';
+import { ambilRuteLengkap } from '../../layanan/navigasiLayanan';
 import { svgRumah, svgSekolah, svgBus, htmlLencanaIkon } from '../../bantuan/ikonPeta';
 import { hitungJarakKm } from '../../bantuan/jarak';
 
@@ -57,6 +57,7 @@ let langgananRealtime: { unsubscribe: () => void } | null = null;
 
 const sedangMuatRute = ref(false);
 const ruteIkutiJalan = ref(true);
+const estimasiMenit = ref<number | null>(null);
 
 // Ikon marker peta -- dibangun dari fungsi bersama di bantuan/ikonPeta.ts
 // (svgRumah/svgSekolah/svgBus + htmlLencanaIkon) supaya badge legend di
@@ -194,10 +195,11 @@ async function hitungUlangRute(origin: { lat: number; lng: number } | null) {
 
   const titik: [number, number][] = [asal, [props.lintangSekolah, props.bujurSekolah]];
   sedangMuatRute.value = true;
-  const jalurJalan = await ambilRuteJalan(titik);
+  const hasil = await ambilRuteLengkap(titik);
   sedangMuatRute.value = false;
-  ruteIkutiJalan.value = jalurJalan !== null;
-  const jalur = jalurJalan ?? titik;
+  ruteIkutiJalan.value = hasil?.ikutiJalan ?? false;
+  estimasiMenit.value = hasil?.durasiMenit ?? null;
+  const jalur = hasil?.koordinat ?? titik;
 
   if (garisRuteKecil) garisRuteKecil.setLatLngs(jalur);
   if (garisRutePenuh) garisRutePenuh.setLatLngs(jalur);
@@ -324,6 +326,7 @@ onUnmounted(() => {
     </div>
     <p class="text-center text-[11px] text-primary font-semibold">
       {{ sedangMuatRute ? 'Menghitung rute jalan...' : (ruteIkutiJalan ? 'Rute mengikuti jalan' : 'Rute garis lurus (perkiraan)') }}
+      <template v-if="!sedangMuatRute && estimasiMenit != null"> &middot; Estimasi tiba: {{ estimasiMenit }} menit</template>
     </p>
   </div>
 

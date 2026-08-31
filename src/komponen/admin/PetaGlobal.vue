@@ -2,8 +2,9 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ambilRuteJalan } from '../../layanan/navigasiLayanan';
+import { ambilRuteLengkap } from '../../layanan/navigasiLayanan';
 import { warnaUntukSupir } from '../../bantuan/warnaSupir';
+import { hitungJarakKm } from '../../bantuan/jarak';
 
 interface DriverPosition {
   id: string;
@@ -52,6 +53,15 @@ const ruteCache: { [key: string]: [number, number][] } = {};
 // tujuannya berubah (baru perlu hitung ulang) atau tidak (polyline lama
 // tetap dipertahankan apa adanya).
 const cacheKeyAktif: { [supirId: string]: string } = {};
+// Estimasi waktu tempuh (menit) HASIL rute OSRM sungguhan -- ditampilkan di
+// popup supir, diperbarui bersamaan dengan polyline (lihat renderMarkers).
+const estimasiMenitAktif: { [supirId: string]: number | undefined } = {};
+// Titik asal (posisi supir) tempat rute+estimasi TERAKHIR dihitung --
+// dipakai untuk memutuskan kapan perlu dihitung ULANG walau tujuannya
+// belum berubah: kalau supir sudah berpindah cukup jauh (>150m) dari titik
+// ini, estimasi waktu sudah tidak akurat lagi meski arah tujuannya sama.
+const asalRuteAktif: { [supirId: string]: { lat: number; lng: number } } = {};
+const AMBANG_HITUNG_ULANG_KM = 0.15; // ~150 meter
 
 const kunciRute = (supir: DriverPosition) => `${supir.id}_${supir.destLat?.toFixed(5)}_${supir.destLng?.toFixed(5)}`;
 
@@ -83,7 +93,10 @@ const popupSupir = (supir: DriverPosition, nomor: number, warna: string) => `
       ${nomor}. ${supir.nama}
     </strong>
     <span class="font-semibold text-slate-500">Status:</span> ${supir.status === 'aktif' ? 'Online (Bertugas)' : 'Offline'}<br>
-    <span class="font-semibold text-slate-500">Sekolah:</span> ${supir.sekolahTujuan || '-'}
+    <span class="font-semibold text-slate-500">Sekolah:</span> ${supir.sekolahTujuan || '-'}<br>
+    <span class="font-semibold text-slate-500">Estimasi tiba:</span> ${
+      estimasiMenitAktif[supir.id] != null ? `${estimasiMenitAktif[supir.id]} menit` : (supir.status === 'aktif' ? 'Menghitung...' : '-')
+    }
   </div>
 `;
 
@@ -153,47 +166,55 @@ const renderMarkers = () => {
         .bindPopup(popupSupir(supir, nomor, warna));
     }
 
-    // 2. Rute (data RUTE, terpisah total dari posisi) -- hanya dihitung
-    // ulang kalau TUJUANNYA berubah (kunciRute tidak memasukkan posisi
-    // supir sekarang), atau supir baru pertama kali online/tidak lagi
-    // punya tujuan. Polyline yang sudah ada TIDAK PERNAH ditimpa garis
-    // lurus hanya karena posisi supir berpindah.
+    // 2. Rute + estimasi waktu (data RUTE, terpisah total dari posisi) --
+    // dihitung ulang kalau TUJUANNYA berubah (kunciRute tidak memasukkan
+    // posisi supir sekarang), supir baru pertama kali online/tidak lagi
+    // punya tujuan, ATAU supir sudah berpindah cukup jauh (>150m) dari
+    // titik asal rute yang sedang tergambar -- tanpa syarat ketiga ini,
+    // estimasi waktu akan terus menampilkan angka yang sama sepanjang
+    // perjalanan walau supir sudah dekat dengan tujuan.
     if (isOnline && supir.destLat != null && supir.destLng != null) {
       const cacheKey = kunciRute(supir);
+      const tujuanBerubah = cacheKeyAktif[supir.id] !== cacheKey;
+      const asal = asalRuteAktif[supir.id];
+      const sudahJauhBerpindah = !!asal && hitungJarakKm(asal.lat, asal.lng, supir.lat, supir.lng) >= AMBANG_HITUNG_ULANG_KM;
 
-      if (cacheKeyAktif[supir.id] !== cacheKey) {
-        // Tujuan berubah (atau baru pertama kali) -- hitung ulang.
+      if (tujuanBerubah || sudahJauhBerpindah || !asal) {
         cacheKeyAktif[supir.id] = cacheKey;
+        asalRuteAktif[supir.id] = { lat: supir.lat, lng: supir.lng };
 
-        if (polylines[supir.id]) {
+        if (tujuanBerubah && polylines[supir.id]) {
           mapInstance.removeLayer(polylines[supir.id]);
           delete polylines[supir.id];
         }
 
-        const garisAwal: [number, number][] = ruteCache[cacheKey] ?? [[supir.lat, supir.lng], [supir.destLat, supir.destLng]];
-        const line = L.polyline(garisAwal, {
-          color: warna, // identitas warna per supir -- lihat warnaUntukSupir()
-          weight: 3,
-          opacity: 0.8,
-          dashArray: '5, 10'
-        }).addTo(mapInstance);
-        polylines[supir.id] = line;
-
-        if (!ruteCache[cacheKey]) {
-          ambilRuteJalan([[supir.lat, supir.lng], [supir.destLat, supir.destLng]]).then((coords) => {
-            if (coords) {
-              ruteCache[cacheKey] = coords;
-              // Cuma terapkan kalau supir ini masih menuju tujuan yang sama
-              // saat hasil OSRM datang (bisa saja sudah berganti tujuan lagi).
-              if (cacheKeyAktif[supir.id] === cacheKey && polylines[supir.id] === line) {
-                line.setLatLngs(coords);
-              }
-            }
-          });
+        if (!polylines[supir.id]) {
+          const garisAwal: [number, number][] = tujuanBerubah
+            ? (ruteCache[cacheKey] ?? [[supir.lat, supir.lng], [supir.destLat, supir.destLng]])
+            : [[supir.lat, supir.lng], [supir.destLat, supir.destLng]];
+          polylines[supir.id] = L.polyline(garisAwal, {
+            color: warna, // identitas warna per supir -- lihat warnaUntukSupir()
+            weight: 3,
+            opacity: 0.8,
+            dashArray: '5, 10'
+          }).addTo(mapInstance);
         }
+        const line = polylines[supir.id];
+
+        ambilRuteLengkap([[supir.lat, supir.lng], [supir.destLat, supir.destLng]]).then((hasil) => {
+          if (!hasil) return;
+          ruteCache[cacheKey] = hasil.koordinat;
+          estimasiMenitAktif[supir.id] = hasil.durasiMenit;
+          // Cuma terapkan kalau supir ini masih menuju tujuan yang sama &
+          // polyline-nya belum diganti/dihapus saat hasil OSRM datang.
+          if (polylines[supir.id] === line) {
+            line.setLatLngs(hasil.koordinat);
+            if (markers[supir.id]) markers[supir.id].setPopupContent(popupSupir(supir, nomor, warna));
+          }
+        });
       }
-      // cacheKey SAMA -- tujuan belum berubah, polyline yang sudah ada
-      // dibiarkan apa adanya, tidak disentuh sama sekali.
+      // Tidak ada kondisi di atas yang terpenuhi -- rute & estimasi yang
+      // sudah ada dibiarkan apa adanya, tidak disentuh sama sekali.
 
       // 3. Marker tujuan -- geser kalau sudah ada & tujuannya sama, buat
       // ulang kalau tujuan berubah.
@@ -210,6 +231,8 @@ const renderMarkers = () => {
         mapInstance.removeLayer(polylines[supir.id]);
         delete polylines[supir.id];
         delete cacheKeyAktif[supir.id];
+        delete asalRuteAktif[supir.id];
+        delete estimasiMenitAktif[supir.id];
       }
       if (destMarkers[supir.id]) {
         mapInstance.removeLayer(destMarkers[supir.id]);

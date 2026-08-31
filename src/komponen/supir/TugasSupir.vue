@@ -24,7 +24,7 @@ import {
 import type { StatusPerjalanan } from '../../tipe';
 import { hitungJarakKm } from '../../bantuan/jarak';
 import { ambilTanggalWibSekarang } from '../../bantuan/waktuSimulasi';
-import { ambilRuteJalan } from '../../layanan/navigasiLayanan';
+import { ambilRuteJalan, ambilRuteLengkap } from '../../layanan/navigasiLayanan';
 import { denganBatasWaktu } from '../../bantuan/batasWaktu';
 import { useAuth } from '../../komposabel/useAuth';
 import { gunakanRealtimeSubscription } from '../../layanan/realtimeLayanan';
@@ -321,9 +321,6 @@ const tugasTerurut = computed(() => {
   return list;
 });
 
-// Suggested route order details
-const totalWaktuEst = computed(() => tugasTerfilter.value.length * 12);
-
 // Simulasi Pergerakan (khusus demo, mis. sidang tugas akhir) -- lihat
 // catatan lengkap di useLokasiSupir.ts. Titik jemput mentah (garis lurus
 // antar anak) di sini cuma dipakai sebagai FALLBACK/permintaan ke OSRM --
@@ -346,6 +343,65 @@ const titikJemputMentah = computed(() => {
   const titik = sesiTerpilih.value === 'sore' ? [...titikSekolah, ...titikAnak] : [...titikAnak, ...titikSekolah];
   return titik;
 });
+
+// Estimasi waktu tempuh -- DIHITUNG dari rute OSRM sungguhan (posisi supir
+// -> tiap titik singgah terurut -> sekolah), BUKAN angka tetap per titik
+// singgah seperti sebelumnya (`length * 12`). Async, jadi disimpan sebagai
+// ref biasa yang diperbarui lewat hitungUlangEstimasiWaktu(), bukan computed.
+const totalWaktuEst = ref(0);
+let idPermintaanEstimasi = 0;
+// Titik asal (posisi supir) tempat estimasi TERAKHIR dihitung -- sama
+// seperti pola di PetaRuteOptimal.vue, supaya tidak fetch OSRM di setiap
+// tick GPS, cukup kalau supir sudah berpindah cukup jauh.
+let asalEstimasiTerakhir: { lat: number; lng: number } | null = null;
+const AMBANG_HITUNG_ULANG_ESTIMASI_KM = 0.15; // ~150 meter
+
+const hitungUlangEstimasiWaktu = async () => {
+  const permintaanSaatIni = ++idPermintaanEstimasi;
+  const tujuan = titikJemputMentah.value;
+  if (tujuan.length === 0) {
+    totalWaktuEst.value = 0;
+    asalEstimasiTerakhir = null;
+    return;
+  }
+
+  const posisiAwal = posisiSaatIni.value;
+  asalEstimasiTerakhir = posisiAwal ? { ...posisiAwal } : null;
+
+  const semuaTitik: [number, number][] = [
+    ...(posisiAwal ? [[posisiAwal.lat, posisiAwal.lng] as [number, number]] : []),
+    ...tujuan.map((t) => [t.lat, t.lng] as [number, number])
+  ];
+  if (semuaTitik.length < 2) {
+    totalWaktuEst.value = 0;
+    return;
+  }
+
+  const hasil = await ambilRuteLengkap(semuaTitik);
+  if (permintaanSaatIni !== idPermintaanEstimasi) return; // hasil basi, sudah ada permintaan baru
+  totalWaktuEst.value = hasil?.durasiMenit ?? 0;
+};
+
+// Hitung ulang tiap kali urutan/jumlah titik singgah berubah (ganti sesi,
+// ganti filter sekolah, tugas baru masuk/dibatalkan realtime, dsb).
+watch(titikJemputMentah, hitungUlangEstimasiWaktu, { deep: true, immediate: true });
+
+// Hitung ulang saat posisi supir bergerak -- tapi diberi ambang jarak
+// (bukan tiap tick GPS) supaya tidak membanjiri server OSRM demo, sama
+// persis pola yang dipakai PetaRuteOptimal.vue/PetaLokasiLangsung.vue untuk
+// menghitung ulang garis rute.
+watch(posisiSaatIni, (posisi) => {
+  if (!posisi) return;
+  if (!asalEstimasiTerakhir) {
+    hitungUlangEstimasiWaktu();
+    return;
+  }
+  const jarakKm = hitungJarakKm(asalEstimasiTerakhir.lat, asalEstimasiTerakhir.lng, posisi.lat, posisi.lng);
+  if (jarakKm >= AMBANG_HITUNG_ULANG_ESTIMASI_KM) {
+    hitungUlangEstimasiWaktu();
+  }
+}, { deep: true });
+
 const sedangMuatRuteSimulasi = ref(false);
 const mulaiDemoSimulasi = async () => {
   const titikMentah = titikJemputMentah.value;
